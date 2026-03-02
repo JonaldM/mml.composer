@@ -26,6 +26,7 @@ class MmlEventSubscription(models.Model):
             ('event_type', '=', event_type),
             ('handler_model', '=', handler_model),
             ('handler_method', '=', handler_method),
+            ('module', '=', module),
         ])
         if not exists:
             self.create({
