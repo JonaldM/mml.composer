@@ -8,6 +8,7 @@
     'depends': ['mail', 'base'],
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_cron.xml',
     ],
     'post_init_hook': 'post_init_hook',
     'uninstall_hook': 'uninstall_hook',
