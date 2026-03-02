@@ -1,5 +1,9 @@
 import json
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class MmlLicense(models.Model):
@@ -7,7 +11,11 @@ class MmlLicense(models.Model):
     _description = 'MML License Cache'
 
     org_ref = fields.Char(help='Organisation identifier from the MML platform')
-    license_key = fields.Char(help='Secret license key — do not share')
+    license_key = fields.Char(
+        help='Secret license key — do not share',
+        password=True,
+        groups='base.group_system',
+    )
     tier = fields.Selection([
         ('internal', 'Internal'),
         ('starter', 'Starter'),
@@ -38,5 +46,14 @@ class MmlLicense(models.Model):
     def module_permitted(self, module_name: str) -> bool:
         """Return True if this license grants access to the given module."""
         self.ensure_one()
-        grants = json.loads(self.module_grants_json or '["*"]')
+        try:
+            grants = json.loads(self.module_grants_json or '["*"]')
+            if not isinstance(grants, list):
+                raise ValueError('module_grants_json must be a JSON list')
+        except (json.JSONDecodeError, ValueError):
+            _logger.warning(
+                'mml.license %s has invalid module_grants_json — denying access (fail-secure)',
+                self.id,
+            )
+            return False
         return '*' in grants or module_name in grants
