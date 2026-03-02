@@ -45,7 +45,7 @@ class MmlEvent(models.Model):
         source_module: str = '',
     ) -> 'MmlEvent':
         """Create and persist a billable event. Call from any mml_* module."""
-        return self.create({
+        event = self.create({
             'event_type': event_type,
             'quantity': quantity,
             'billable_unit': billable_unit,
@@ -54,3 +54,5 @@ class MmlEvent(models.Model):
             'payload_json': json.dumps(payload or {}),
             'source_module': source_module,
         })
+        self.env['mml.event.subscription'].dispatch(event)
+        return event
