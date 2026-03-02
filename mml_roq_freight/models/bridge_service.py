@@ -45,5 +45,7 @@ class MmlRoqFreightBridge(models.AbstractModel):
         Called when a freight booking is confirmed.
         Feeds transit time back to ROQ lead-time stats.
         """
+        if not event.res_id:
+            return
         svc = self.env['mml.registry'].service('roq')
         svc.on_freight_booking_confirmed(event)

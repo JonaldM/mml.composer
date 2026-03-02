@@ -4,6 +4,11 @@ Structural tests are pure-Python; Odoo integration tests require --test-enable.
 """
 import pytest
 
+try:
+    from odoo.tests.common import TransactionCase
+except ImportError:
+    TransactionCase = object  # fallback for pure-Python pytest run
+
 
 def test_manifest_importable():
     """Bridge module directory is importable as a package."""
@@ -52,7 +57,7 @@ def test_hooks_have_post_init_and_uninstall():
 
 
 @pytest.mark.odoo_integration
-class TestROQFreightBridge:
+class TestROQFreightBridge(TransactionCase):
     """Odoo integration tests — require --test-enable. Skipped by plain pytest."""
 
     def test_freight_tender_field_on_shipment_group(self):
