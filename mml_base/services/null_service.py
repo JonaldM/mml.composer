@@ -7,6 +7,10 @@ class NullService:
     def __getattr__(self, name):
         return lambda *args, **kwargs: None
 
+    def available(self):
+        """Stub: NullService is never available — the real module is not installed."""
+        return False
+
     def get_booking_status(self, shipment_group_id):
         """Stub: mml_freight not installed — no booking status available."""
         return None
