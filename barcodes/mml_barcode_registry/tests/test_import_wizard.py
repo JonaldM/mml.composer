@@ -31,7 +31,8 @@ class TestImportWizard(TransactionCase):
         cls.product = cls.env['product.product'].create({
             'name': 'Import Product',
             'type': 'consu',
-            'barcode': '3333333100004',  # will match on import by barcode
+            # GTIN-13 for sequence '333333310002' (prefix 3333333, seq_num 10002)
+            'barcode': '3333333100022',
         })
 
     def _make_wizard(self, csv_data: bytes):
@@ -43,8 +44,8 @@ class TestImportWizard(TransactionCase):
 
     def test_csv_import_creates_registry_records(self):
         rows = [
-            {'sequence': '333333310000', 'gtin_13': '3333333100004', 'description': 'Import Product'},
-            {'sequence': '333333310001', 'gtin_13': '3333333100011', 'description': ''},
+            {'sequence': '333333310000', 'gtin_13': '3333333100008', 'description': ''},
+            {'sequence': '333333310001', 'gtin_13': '3333333100015', 'description': ''},
         ]
         wizard = self._make_wizard(_make_csv(rows))
         wizard.action_import()
@@ -54,8 +55,9 @@ class TestImportWizard(TransactionCase):
         self.assertEqual(count, 2)
 
     def test_matched_product_gets_active_allocation(self):
+        # gtin_13 matches product.barcode exactly — exercises the barcode-match path
         rows = [
-            {'sequence': '333333310002', 'gtin_13': '3333333100028', 'description': 'Import Product'},
+            {'sequence': '333333310002', 'gtin_13': '3333333100022', 'description': 'Import Product'},
         ]
         wizard = self._make_wizard(_make_csv(rows))
         wizard.action_import()
@@ -67,7 +69,7 @@ class TestImportWizard(TransactionCase):
 
     def test_unmatched_row_stays_unallocated(self):
         rows = [
-            {'sequence': '333333310003', 'gtin_13': '3333333100035', 'description': ''},
+            {'sequence': '333333310003', 'gtin_13': '3333333100039', 'description': ''},
         ]
         wizard = self._make_wizard(_make_csv(rows))
         wizard.action_import()
@@ -78,7 +80,7 @@ class TestImportWizard(TransactionCase):
 
     def test_idempotent_on_reimport(self):
         rows = [
-            {'sequence': '333333310004', 'gtin_13': '3333333100042', 'description': ''},
+            {'sequence': '333333310004', 'gtin_13': '3333333100046', 'description': ''},
         ]
         csv_data = _make_csv(rows)
         self._make_wizard(csv_data).action_import()
@@ -89,7 +91,7 @@ class TestImportWizard(TransactionCase):
         self.assertEqual(count, 1)
 
     def test_invalid_check_digit_flagged_as_warning(self):
-        # gtin_13 '3333333100099' has wrong check digit — correct is 3333333100091
+        # correct GTIN-13 for seq '333333310009' is '3333333100091'; '99' has wrong check digit
         rows = [
             {'sequence': '333333310009', 'gtin_13': '3333333100099', 'description': ''},
         ]

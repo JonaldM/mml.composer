@@ -1,7 +1,7 @@
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
-_MAX_GENERATE_RANGE = 10_000
+_MAX_GENERATE_RANGE = 100_000
 
 
 class BarcodePrefix(models.Model):
@@ -61,7 +61,7 @@ class BarcodePrefix(models.Model):
     def _check_prefix_format(self):
         for rec in self:
             if rec.prefix and (len(rec.prefix) != 7 or not rec.prefix.isdigit()):
-                raise UserError(
+                raise ValidationError(
                     f"GS1 prefix must be exactly 7 digits, got: {rec.prefix!r}"
                 )
 

@@ -1,6 +1,6 @@
 # MML Odoo Apps — Module Monorepo
 
-Odoo 19 modules for **MML Consumer Products Ltd**, a NZ-based distribution company (~400 SKUs, 5 brands). This repository is the integration layer that connects the individual functional modules into a single operational platform.
+Odoo 19 modules for **MML Consumer Products Ltd**, a NZ-based distribution company (~400 SKUs, 5 brands). Each module is a standalone Odoo app — independently installable, independently billable. Built for internal MML operations with a SaaS distribution path.
 
 ---
 
@@ -11,6 +11,7 @@ mml.odoo.apps/
 ├── mml_base/              ← Platform layer — must be installed first
 ├── mml_roq_freight/       ← Bridge: ROQ ↔ Freight (auto_install)
 ├── mml_freight_3pl/       ← Bridge: Freight ↔ 3PL (auto_install)
+├── barcodes/              ← mml_barcode_registry — GTIN lifecycle management
 ├── roq.model/             ← mml_roq_forecast module (git subdir → mml.roq.odoo)
 ├── fowarder.intergration/ ← mml_freight + adapters (git subdir → mml.freight.fowarder)
 ├── mainfreight.3pl.intergration/ ← stock_3pl_core + stock_3pl_mainfreight (git subdir → mml.3pl.odoo)
@@ -97,11 +98,11 @@ odoo-bin -d <db> -i mml_roq_freight,mml_freight_3pl --stop-after-init
 
 | Repo | GitHub | Contents |
 |------|--------|---------|
-| `mml.composer` | [JonaldMan/mml.composer](https://github.com/JonaldMan/mml.composer) | This repo — mml_base + bridges |
-| `mml.roq.odoo` | [JonaldMan/mml.roq.odoo](https://github.com/JonaldMan/mml.roq.odoo) | `mml_roq_forecast` |
-| `mml.freight.fowarder` | [JonaldMan/mml.freight.fowarder](https://github.com/JonaldMan/mml.freight.fowarder) | `mml_freight` + carrier adapters |
-| `mml.3pl.odoo` | [JonaldMan/mml.3pl.odoo](https://github.com/JonaldMan/mml.3pl.odoo) | `stock_3pl_core` + `stock_3pl_mainfreight` |
-| `mml.edi.odoo` | [JonaldMan/mml.edi.odoo](https://github.com/JonaldMan/mml.edi.odoo) | `mml_edi` |
+| `mml.composer` | [JonaldM/mml.composer](https://github.com/JonaldM/mml.composer) | This repo — mml_base + bridges |
+| `mml.roq.odoo` | [JonaldM/mml.roq.odoo](https://github.com/JonaldM/mml.roq.odoo) | `mml_roq_forecast` |
+| `mml.freight.fowarder` | [JonaldM/mml.freight.fowarder](https://github.com/JonaldM/mml.freight.fowarder) | `mml_freight` + carrier adapters |
+| `mml.3pl.odoo` | [JonaldM/mml.3pl.odoo](https://github.com/JonaldM/mml.3pl.odoo) | `stock_3pl_core` + `stock_3pl_mainfreight` |
+| `mml.edi.odoo` | [JonaldM/mml.edi.odoo](https://github.com/JonaldM/mml.edi.odoo) | `mml_edi` |
 
 ---
 
