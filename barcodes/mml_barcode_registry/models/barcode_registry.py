@@ -98,6 +98,7 @@ class BarcodeRegistry(models.Model):
                 rec.check_digit = 0
                 rec.gtin_14 = False
 
+    @api.depends('allocation_ids.reuse_eligible_date')
     def _compute_reuse_eligible_date(self):
         for rec in self:
             latest = self.env['mml.barcode.allocation'].search([
@@ -111,7 +112,7 @@ class BarcodeRegistry(models.Model):
         allowed = _VALID_REGISTRY_TRANSITIONS.get(self.status, [])
         if new_status not in allowed:
             raise UserError(
-                f"Cannot transition barcode {self.gtin_13 or self.sequence!r} from "
+                f"Cannot transition barcode {(self.gtin_13 or self.sequence)!r} from "
                 f"'{self.status}' to '{new_status}'."
             )
 
@@ -132,8 +133,7 @@ class BarcodeRegistry(models.Model):
 
     def action_return_to_pool(self):
         """Move retired registry record back to unallocated. Requires 48-month cool-down."""
-        from odoo.fields import Date
-        today = Date.today()
+        today = fields.Date.today()
         for rec in self:
             rec._validate_transition('unallocated')
             if rec.reuse_eligible_date and rec.reuse_eligible_date > today:

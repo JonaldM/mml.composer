@@ -1,4 +1,7 @@
 from odoo import api, fields, models
+from odoo.exceptions import UserError
+
+_MAX_GENERATE_RANGE = 10_000
 
 
 class BarcodePrefix(models.Model):
@@ -26,49 +29,77 @@ class BarcodePrefix(models.Model):
         default=lambda self: self.env.company,
     )
 
+    # Reverse relation — used to declare computed field dependencies
+    registry_ids = fields.One2many('mml.barcode.registry', 'prefix_id', string='Registry Records')
+
     capacity = fields.Integer(
-        compute='_compute_stats',
+        compute='_compute_capacity',
         store=True,
-        depends=['sequence_start', 'sequence_end'],
+        help='Total number of sequence slots in this prefix block',
     )
     allocated_count = fields.Integer(
-        compute='_compute_stats',
+        compute='_compute_live_stats',
         store=False,
+        help='Number of registry records that are not unallocated',
     )
     utilisation_pct = fields.Float(
-        compute='_compute_stats',
+        compute='_compute_live_stats',
         store=False,
         digits=(5, 1),
     )
     next_sequence = fields.Integer(
-        compute='_compute_stats',
+        compute='_compute_live_stats',
         store=False,
+        help='Next sequence number with no registry record',
     )
 
     _sql_constraints = [
         ('prefix_company_uniq', 'UNIQUE(prefix, company_id)', 'Prefix must be unique per company.'),
     ]
 
-    @api.depends('sequence_start', 'sequence_end')
-    def _compute_stats(self):
+    @api.constrains('prefix')
+    def _check_prefix_format(self):
         for rec in self:
-            if rec.sequence_start and rec.sequence_end:
+            if rec.prefix and (len(rec.prefix) != 7 or not rec.prefix.isdigit()):
+                raise UserError(
+                    f"GS1 prefix must be exactly 7 digits, got: {rec.prefix!r}"
+                )
+
+    @api.depends('sequence_start', 'sequence_end')
+    def _compute_capacity(self):
+        for rec in self:
+            if rec.sequence_start is not None and rec.sequence_end is not None:
                 rec.capacity = max(0, rec.sequence_end - rec.sequence_start + 1)
             else:
                 rec.capacity = 0
-            registry = self.env['mml.barcode.registry']
-            all_records = registry.search([('prefix_id', '=', rec.id)])
+
+    @api.depends('registry_ids.status', 'registry_ids.sequence', 'sequence_start', 'sequence_end')
+    def _compute_live_stats(self):
+        for rec in self:
+            capacity = (
+                max(0, rec.sequence_end - rec.sequence_start + 1)
+                if rec.sequence_start is not None and rec.sequence_end is not None
+                else 0
+            )
+            all_records = rec.registry_ids
             rec.allocated_count = sum(1 for r in all_records if r.status != 'unallocated')
-            rec.utilisation_pct = (rec.allocated_count / rec.capacity * 100.0) if rec.capacity else 0.0
+            rec.utilisation_pct = (rec.allocated_count / capacity * 100.0) if capacity else 0.0
             unallocated_seqs = [r.sequence for r in all_records if r.status == 'unallocated']
             if unallocated_seqs:
                 rec.next_sequence = int(min(unallocated_seqs)[-5:])
             else:
-                rec.next_sequence = rec.sequence_end + 1 if rec.sequence_end else 0
+                rec.next_sequence = rec.sequence_end + 1 if rec.sequence_end is not None else 0
 
     def action_generate_sequences(self):
         """Bulk-create unallocated registry slots for the full prefix range. Idempotent."""
         self.ensure_one()
+        total = self.sequence_end - self.sequence_start + 1
+        if total > _MAX_GENERATE_RANGE:
+            raise UserError(
+                f"Range of {total:,} sequences exceeds the maximum of "
+                f"{_MAX_GENERATE_RANGE:,} allowed per operation. "
+                f"Split your prefix block into smaller ranges."
+            )
         Registry = self.env['mml.barcode.registry']
 
         existing_sequences = set(
