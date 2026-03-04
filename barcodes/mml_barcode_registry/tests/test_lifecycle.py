@@ -74,17 +74,20 @@ class TestAllocationLifecycle(TransactionCase):
 
     def test_dormant_to_active(self):
         registry = self._get_unallocated()
+        future_date = date.today() + relativedelta(months=48)
         alloc = self.env['mml.barcode.allocation'].create({
             'registry_id': registry.id,
             'product_id': self.product.id,
             'status': 'dormant',
             'allocation_date': date.today(),
             'discontinue_date': date.today(),
+            'reuse_eligible_date': future_date,
             'company_id': self.env.company.id,
         })
         alloc.action_reactivate()
         self.assertEqual(alloc.status, 'active')
         self.assertFalse(alloc.discontinue_date)
+        self.assertFalse(alloc.reuse_eligible_date)
 
     def test_dormant_to_discontinued_blocked_before_eligible(self):
         registry = self._get_unallocated()
