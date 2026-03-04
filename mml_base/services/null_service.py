@@ -6,3 +6,7 @@ class NullService:
 
     def __getattr__(self, name):
         return lambda *args, **kwargs: None
+
+    def get_booking_status(self, shipment_group_id):
+        """Stub: mml_freight not installed — no booking status available."""
+        return None
