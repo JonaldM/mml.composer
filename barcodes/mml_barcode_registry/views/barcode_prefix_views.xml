@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_barcode_prefix_tree" model="ir.ui.view">
+        <field name="name">mml.barcode.prefix.tree</field>
+        <field name="model">mml.barcode.prefix</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="prefix" class="font-monospace"/>
+                <field name="allocated_count"/>
+                <field name="capacity"/>
+                <field name="utilisation_pct" string="Utilisation %"
+                       decoration-danger="utilisation_pct &gt; 90"
+                       decoration-warning="utilisation_pct &gt; 75"/>
+                <field name="priority"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_barcode_prefix_form" model="ir.ui.view">
+        <field name="name">mml.barcode.prefix.form</field>
+        <field name="model">mml.barcode.prefix</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_generate_sequences"
+                            string="Generate Sequences"
+                            type="object"
+                            class="btn-primary"
+                            invisible="allocated_count &gt;= capacity and capacity &gt; 0"
+                            confirm="This will create unallocated registry slots for the full sequence range. Continue?"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_barcode_registry)d" type="action"
+                                class="oe_stat_button" icon="fa-barcode"
+                                context="{'search_default_in_use': 1, 'default_prefix_id': active_id}">
+                            <field name="allocated_count" widget="statinfo" string="In Use"/>
+                        </button>
+                        <button name="%(action_barcode_registry)d" type="action"
+                                class="oe_stat_button" icon="fa-database"
+                                context="{'search_default_unallocated': 1, 'default_prefix_id': active_id}">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="capacity"/>
+                                </span>
+                                <span class="o_stat_text">Capacity</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="utilisation_pct &lt;= 90">
+                        <strong>Capacity Warning:</strong>
+                        Utilisation is above 90%. Contact
+                        <a href="https://www.gs1nz.org" target="_blank">GS1 NZ</a>
+                        to acquire an additional number block before you run out.
+                    </div>
+                    <group>
+                        <group string="GS1 Configuration">
+                            <field name="name"/>
+                            <field name="prefix" class="font-monospace"/>
+                            <field name="sequence_start"/>
+                            <field name="sequence_end"/>
+                            <field name="priority"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Utilisation">
+                            <field name="capacity"/>
+                            <field name="allocated_count"/>
+                            <field name="utilisation_pct" string="Utilisation %"
+                                   decoration-danger="utilisation_pct &gt; 90"
+                                   decoration-warning="utilisation_pct &gt; 75"/>
+                            <field name="next_sequence"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_barcode_prefix" model="ir.actions.act_window">
+        <field name="name">Prefixes</field>
+        <field name="res_model">mml.barcode.prefix</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>
