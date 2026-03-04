@@ -22,7 +22,7 @@ class MmlEventSubscription(models.Model):
 
     event_type = fields.Char(required=True, index=True)
     handler_model = fields.Char(required=True)
-    handler_method = fields.Char(required=True)
+    handler_method = fields.Char(required=True, size=128)
     module = fields.Char(required=True, index=True)
 
     @api.model

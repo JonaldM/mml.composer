@@ -15,7 +15,7 @@ class Mml3plBridge(models.AbstractModel):
     _description = 'Freight-3PL Event Bridge'
 
     @api.model
-    def on_freight_booking_confirmed(self, event) -> None:
+    def _on_freight_booking_confirmed(self, event) -> None:
         """
         Queue a 3PL inward order for each purchase order linked to the confirmed booking.
         freight.booking.po_ids is Many2many — one inward order message per PO.

@@ -16,7 +16,7 @@ class MmlRoqFreightBridge(models.AbstractModel):
     _description = 'ROQ-Freight Event Bridge'
 
     @api.model
-    def on_shipment_group_confirmed(self, event) -> None:
+    def _on_shipment_group_confirmed(self, event) -> None:
         """
         Called when a ROQ shipment group is confirmed.
         Creates a freight tender via FreightService.
@@ -54,7 +54,7 @@ class MmlRoqFreightBridge(models.AbstractModel):
             )
 
     @api.model
-    def on_freight_booking_confirmed(self, event) -> None:
+    def _on_freight_booking_confirmed(self, event) -> None:
         """
         Called when a freight booking is confirmed.
         Feeds transit time back to ROQ lead-time stats.

@@ -3,7 +3,7 @@ def post_init_hook(env):
     env['mml.event.subscription'].register(
         event_type='freight.booking.confirmed',
         handler_model='mml.3pl.bridge',
-        handler_method='on_freight_booking_confirmed',
+        handler_method='_on_freight_booking_confirmed',
         module='mml_freight_3pl',
     )
 

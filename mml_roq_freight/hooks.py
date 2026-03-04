@@ -4,14 +4,14 @@ def post_init_hook(env):
     env['mml.event.subscription'].register(
         event_type='roq.shipment_group.confirmed',
         handler_model='mml.roq.freight.bridge',
-        handler_method='on_shipment_group_confirmed',
+        handler_method='_on_shipment_group_confirmed',
         module='mml_roq_freight',
     )
     # When a freight booking is confirmed → update ROQ lead-time feedback
     env['mml.event.subscription'].register(
         event_type='freight.booking.confirmed',
         handler_model='mml.roq.freight.bridge',
-        handler_method='on_freight_booking_confirmed',
+        handler_method='_on_freight_booking_confirmed',
         module='mml_roq_freight',
     )
 
