@@ -1,4 +1,3 @@
-# barcodes/mml_barcode_registry/models/barcode_allocation.py
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models
@@ -16,6 +15,13 @@ _VALID_ALLOCATION_TRANSITIONS = {
     'dormant': ['active', 'discontinued'],
     'discontinued': [],  # terminal — no transitions out
 }
+
+
+def _months_until(target_date, today):
+    """Return approximate months remaining (ceiling) until target_date from today."""
+    delta = relativedelta(target_date, today)
+    months = delta.years * 12 + delta.months
+    return months + 1 if delta.days > 0 else months
 
 
 class BarcodeAllocation(models.Model):
@@ -66,7 +72,7 @@ class BarcodeAllocation(models.Model):
 
     display_name = fields.Char(compute='_compute_display_name')
 
-    @api.depends('registry_id', 'product_id', 'status')
+    @api.depends('gtin_13', 'product_id.display_name', 'status')
     def _compute_display_name(self):
         for rec in self:
             rec.display_name = (
@@ -75,6 +81,7 @@ class BarcodeAllocation(models.Model):
             )
 
     def _validate_transition(self, new_status):
+        self.ensure_one()
         allowed = _VALID_ALLOCATION_TRANSITIONS.get(self.status, [])
         if new_status not in allowed:
             raise UserError(
@@ -111,18 +118,21 @@ class BarcodeAllocation(models.Model):
         today = date.today()
         for rec in self:
             rec._validate_transition('discontinued')
-            if rec.reuse_eligible_date and rec.reuse_eligible_date > today:
-                months_remaining = (
-                    (rec.reuse_eligible_date.year - today.year) * 12 +
-                    rec.reuse_eligible_date.month - today.month
+            if not rec.reuse_eligible_date:
+                raise UserError(
+                    f"GTIN {rec.gtin_13 or rec.registry_id.sequence!r} has no reuse eligible "
+                    f"date set. Set 'discontinue_date' and allow the system to compute "
+                    f"the eligibility date before discontinuing."
                 )
+            if rec.reuse_eligible_date > today:
+                months = _months_until(rec.reuse_eligible_date, today)
                 raise UserError(
                     f"GTIN {rec.gtin_13} cannot be discontinued yet. "
-                    f"Reuse eligible in approximately {months_remaining} month(s) "
+                    f"Reuse eligible in approximately {months} month(s) "
                     f"(eligible date: {rec.reuse_eligible_date})."
                 )
-            rec.status = 'discontinued'
-            # Return registry slot to pool
+            rec.write({'status': 'discontinued'})
+            # Return registry slot to pool if this is the active allocation
             registry = rec.registry_id
             if registry.current_allocation_id == rec:
                 registry.write({

@@ -117,7 +117,7 @@ class TestAllocationLifecycle(TransactionCase):
             'reuse_eligible_date': past_date,
             'company_id': self.env.company.id,
         })
-        registry.current_allocation_id = alloc.id
+        registry.write({'current_allocation_id': alloc.id})
         alloc.action_discontinue()
         self.assertEqual(alloc.status, 'discontinued')
         self.assertEqual(registry.status, 'unallocated')
@@ -148,12 +148,13 @@ class TestAllocationLifecycle(TransactionCase):
         alloc = self.env['mml.barcode.allocation'].create({
             'registry_id': registry.id,
             'product_id': self.product.id,
-            'status': 'discontinued',
+            'status': 'dormant',
             'allocation_date': date.today(),
+            'discontinue_date': date.today(),
             'reuse_eligible_date': future_date,
             'company_id': self.env.company.id,
         })
-        registry.current_allocation_id = alloc.id
+        registry.write({'current_allocation_id': alloc.id})
         with self.assertRaises(UserError):
             registry.action_return_to_pool()
 
@@ -171,7 +172,7 @@ class TestAllocationLifecycle(TransactionCase):
             'reuse_eligible_date': past_date,
             'company_id': self.env.company.id,
         })
-        registry.current_allocation_id = alloc.id
+        registry.write({'current_allocation_id': alloc.id})
         # Discontinue the allocation — registry returns to unallocated
         alloc.action_discontinue()
         self.assertEqual(registry.status, 'unallocated')

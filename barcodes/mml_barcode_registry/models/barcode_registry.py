@@ -1,3 +1,4 @@
+from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 from odoo.addons.mml_barcode_registry.services.gs1 import build_gtin13, build_gtin14
@@ -109,6 +110,7 @@ class BarcodeRegistry(models.Model):
 
     def _validate_transition(self, new_status):
         """Raise UserError if transition from current status to new_status is not allowed."""
+        self.ensure_one()
         allowed = _VALID_REGISTRY_TRANSITIONS.get(self.status, [])
         if new_status not in allowed:
             raise UserError(
@@ -137,10 +139,8 @@ class BarcodeRegistry(models.Model):
         for rec in self:
             rec._validate_transition('unallocated')
             if rec.reuse_eligible_date and rec.reuse_eligible_date > today:
-                months_remaining = (
-                    (rec.reuse_eligible_date.year - today.year) * 12 +
-                    rec.reuse_eligible_date.month - today.month
-                )
+                delta = relativedelta(rec.reuse_eligible_date, today)
+                months_remaining = delta.years * 12 + delta.months + (1 if delta.days > 0 else 0)
                 raise UserError(
                     f"GTIN {rec.gtin_13} cannot be returned to pool yet. "
                     f"Reuse eligible in approximately {months_remaining} month(s) "
