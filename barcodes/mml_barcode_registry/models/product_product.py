@@ -1,6 +1,10 @@
 # barcodes/mml_barcode_registry/models/product_product.py
+import logging
+
 from odoo import api, fields, models
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class ProductProduct(models.Model):
@@ -125,16 +129,23 @@ class ProductProduct(models.Model):
             'qty': 1.0,
         })
 
-        # 8. Emit billing event
-        self.env['mml.event'].emit(
-            'barcode.gtin.allocated',
-            billable_unit='gtin',
-            quantity=1.0,
-            res_model='product.product',
-            res_id=self.id,
-            source_module='mml_barcode_registry',
-            payload={'gtin_13': registry.gtin_13, 'gtin_14': registry.gtin_14},
-        )
+        # 8. Emit billing event — best-effort; failure must not roll back the allocation
+        try:
+            self.env['mml.event'].emit(
+                'barcode.gtin.allocated',
+                billable_unit='gtin',
+                quantity=1.0,
+                res_model='product.product',
+                res_id=self.id,
+                source_module='mml_barcode_registry',
+                payload={'gtin_13': registry.gtin_13, 'gtin_14': registry.gtin_14},
+            )
+        except Exception:
+            _logger.exception(
+                "Failed to emit barcode.gtin.allocated event for product %s "
+                "(gtin_13=%s). Allocation succeeded.",
+                self.id, registry.gtin_13,
+            )
 
         return {
             'type': 'ir.actions.client',

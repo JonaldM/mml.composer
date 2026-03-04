@@ -100,6 +100,7 @@ class TestOneClickAllocation(TransactionCase):
         ])
         self.assertTrue(packaging)
         self.assertEqual(len(packaging.barcode), 14)
+        self.assertEqual(packaging.qty, 1.0)
 
     def test_allocate_creates_active_allocation(self):
         self.product.action_allocate_barcode()

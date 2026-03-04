@@ -26,7 +26,7 @@ class BarcodeService:
         allocation = env['mml.barcode.allocation'].search([
             ('product_id', '=', product_id),
             ('status', '=', 'active'),
-        ], limit=1, order='allocation_date desc')
+        ], limit=1, order='id desc')
         return {
             'gtin_13': allocation.gtin_13,
             'gtin_14': allocation.registry_id.gtin_14,
