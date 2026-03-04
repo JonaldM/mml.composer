@@ -25,10 +25,24 @@ class MmlRoqFreightBridge(models.AbstractModel):
             return
         payload = json.loads(event.payload_json or '{}')
         svc = self.env['mml.registry'].service('freight')
-        tender_id = svc.create_tender({
-            'shipment_group_ref': payload.get('group_ref', ''),
-            'shipment_group_id': event.res_id,
-        })
+        try:
+            tender_id = svc.create_tender({
+                'shipment_group_ref': payload.get('group_ref', ''),
+                'shipment_group_id': event.res_id,
+            })
+        except Exception as e:
+            _logger.warning(
+                'mml_roq_freight bridge: failed to create freight tender for '
+                'shipment group %s: %s', event.res_id, e,
+            )
+            sg = self.env['roq.shipment.group'].browse(event.res_id)
+            if sg.exists():
+                sg.message_post(
+                    body='Failed to create freight tender automatically: %s' % str(e),
+                    subtype_xmlid='mail.mt_note',
+                )
+            return
+
         if tender_id:
             # Write back the tender link on the shipment group
             self.env['roq.shipment.group'].browse(event.res_id).write(

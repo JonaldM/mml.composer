@@ -34,14 +34,18 @@ class Mml3plBridge(models.AbstractModel):
             msg_id = svc.queue_inward_order(po.id)
             if msg_id:
                 _logger.info(
-                    'mml_freight_3pl: queued 3pl.message %s for booking %s / PO %s',
-                    msg_id, booking.name, po.name,
+                    '3PL bridge: queued inward order for PO id=%s, msg_id=%s', po.id, msg_id
                 )
-            self.env['mml.event'].emit(
-                '3pl.inbound.queued',
-                quantity=1,
-                billable_unit='3pl_receipt',
-                res_model='purchase.order',
-                res_id=po.id,
-                source_module='mml_freight_3pl',
-            )
+                self.env['mml.event'].emit(
+                    '3pl.inbound.queued',
+                    quantity=1,
+                    billable_unit='3pl_receipt',
+                    res_model='purchase.order',
+                    res_id=po.id,
+                    source_module='mml_freight_3pl',
+                )
+            else:
+                _logger.warning(
+                    '3PL bridge: queue_inward_order returned no message ID for PO id=%s — '
+                    'billing event NOT emitted', po.id,
+                )

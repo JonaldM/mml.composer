@@ -16,9 +16,10 @@ class PlatformClientBase:
     def sync_events(self, events) -> bool:
         """Push unsynced mml.event records to the platform. Returns True on success."""
         _logger.debug(
-            'PlatformClientBase.sync_events: stub — %d events not synced', len(events)
+            'PlatformClientBase.sync_events() — stub no-op, %d events not transmitted',
+            len(events) if events else 0,
         )
-        return True
+        return False
 
     def validate_license(self, license_key: str) -> dict:
         """Validate license key against the platform. Returns grant dict."""

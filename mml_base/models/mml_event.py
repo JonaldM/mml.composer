@@ -11,7 +11,7 @@ class MmlEvent(models.Model):
         'res.company', required=True, default=lambda self: self.env.company
     )
     instance_ref = fields.Char(
-        compute='_compute_instance_ref', store=True,
+        store=True,
         help='Identifies the Odoo instance for multi-instance billing',
     )
     event_type = fields.Char(required=True, index=True)
@@ -23,14 +23,6 @@ class MmlEvent(models.Model):
     billable_unit = fields.Char()
     synced_to_platform = fields.Boolean(default=False, index=True)
     timestamp = fields.Datetime(default=fields.Datetime.now, required=True)
-
-    @api.depends()
-    def _compute_instance_ref(self):
-        ref = self.env['ir.config_parameter'].sudo().get_param(
-            'mml.instance_ref', default=''
-        )
-        for rec in self:
-            rec.instance_ref = ref
 
     @api.model
     def emit(
@@ -53,6 +45,7 @@ class MmlEvent(models.Model):
             'res_id': res_id,
             'payload_json': json.dumps(payload or {}),
             'source_module': source_module,
+            'instance_ref': self.env['ir.config_parameter'].sudo().get_param('mml.instance_ref', default=''),
         })
         self.env['mml.event.subscription'].dispatch(event)
         return event

@@ -1,12 +1,24 @@
 import logging
+import re
+
 from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
+
+_HANDLER_METHOD_RE = re.compile(r'^_on_[a-z_]+$')
 
 
 class MmlEventSubscription(models.Model):
     _name = 'mml.event.subscription'
     _description = 'MML Event Subscription'
+
+    _sql_constraints = [
+        (
+            'unique_subscription',
+            'UNIQUE(event_type, handler_model, handler_method, module)',
+            'A subscription for this event_type/handler_model/handler_method/module combination already exists.',
+        ),
+    ]
 
     event_type = fields.Char(required=True, index=True)
     handler_model = fields.Char(required=True)
@@ -46,6 +58,13 @@ class MmlEventSubscription(models.Model):
         """Find all subscriptions for event.event_type and call their handlers."""
         subscriptions = self.search([('event_type', '=', event.event_type)])
         for sub in subscriptions:
+            if not _HANDLER_METHOD_RE.match(sub.handler_method):
+                _logger.error(
+                    'mml.event: rejected dispatch to %s.%s — method name does not match '
+                    'safe pattern ^_on_[a-z_]+$ (subscription id=%s)',
+                    sub.handler_model, sub.handler_method, sub.id,
+                )
+                continue
             try:
                 model = self.env.get(sub.handler_model)
                 if model is not None:

@@ -56,4 +56,10 @@ class MmlLicense(models.Model):
                 self.id,
             )
             return False
+        if self.valid_until and self.valid_until < fields.Date.today():
+            _logger.warning(
+                'mml.license: license expired on %s — denying module %s',
+                self.valid_until, module_name,
+            )
+            return False
         return '*' in grants or module_name in grants
