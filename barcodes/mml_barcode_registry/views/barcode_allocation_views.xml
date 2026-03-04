@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Allocation list view -->
+    <record id="view_barcode_allocation_tree" model="ir.ui.view">
+        <field name="name">mml.barcode.allocation.tree</field>
+        <field name="model">mml.barcode.allocation</field>
+        <field name="arch" type="xml">
+            <tree decoration-success="status == 'active'"
+                  decoration-warning="status == 'dormant'"
+                  decoration-muted="status == 'discontinued'">
+                <field name="gtin_13" class="font-monospace fw-semibold"/>
+                <field name="product_id"/>
+                <field name="brand_id"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'active'"
+                       decoration-warning="status == 'dormant'"
+                       decoration-muted="status == 'discontinued'"/>
+                <field name="allocation_date"/>
+                <field name="discontinue_date" optional="show"/>
+                <field name="reuse_eligible_date" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Allocation form view -->
+    <record id="view_barcode_allocation_form" model="ir.ui.view">
+        <field name="name">mml.barcode.allocation.form</field>
+        <field name="model">mml.barcode.allocation</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_dormant" string="Set Dormant"
+                            type="object" class="btn-primary"
+                            invisible="status != 'active'"/>
+                    <button name="action_reactivate" string="Reactivate"
+                            type="object" class="btn-primary"
+                            invisible="status != 'dormant'"/>
+                    <button name="action_discontinue" string="Discontinue"
+                            type="object"
+                            invisible="status != 'dormant'"
+                            confirm="This will permanently discontinue this GTIN allocation. The 48-month GS1 cool-down period must have elapsed. Continue?"/>
+                    <field name="status" widget="statusbar"
+                           statusbar_visible="active,dormant,discontinued"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="GTIN">
+                            <field name="registry_id"/>
+                            <field name="gtin_13" class="font-monospace fw-bold fs-5"/>
+                        </group>
+                        <group string="Product">
+                            <field name="product_id"/>
+                            <field name="brand_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Dates">
+                            <field name="allocation_date"/>
+                            <field name="discontinue_date"/>
+                            <field name="reuse_eligible_date"/>
+                        </group>
+                    </group>
+                    <field name="notes" placeholder="Notes..." nolabel="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Allocation search view -->
+    <record id="view_barcode_allocation_search" model="ir.ui.view">
+        <field name="name">mml.barcode.allocation.search</field>
+        <field name="model">mml.barcode.allocation</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="gtin_13" string="GTIN-13"/>
+                <field name="product_id"/>
+                <field name="brand_id"/>
+                <filter string="Active" name="active"
+                        domain="[('status', '=', 'active')]"/>
+                <filter string="Dormant" name="dormant"
+                        domain="[('status', '=', 'dormant')]"/>
+                <filter string="Discontinued" name="discontinued"
+                        domain="[('status', '=', 'discontinued')]"/>
+                <filter string="Reuse Eligible" name="reuse_eligible"
+                        domain="[('status', '=', 'dormant'), ('reuse_eligible_date', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Brand" name="group_brand" context="{'group_by': 'brand_id'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Allocation Year" name="group_year" context="{'group_by': 'allocation_date:year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Allocation graph view (by brand) -->
+    <record id="view_barcode_allocation_graph" model="ir.ui.view">
+        <field name="name">mml.barcode.allocation.graph</field>
+        <field name="model">mml.barcode.allocation</field>
+        <field name="arch" type="xml">
+            <graph string="Allocations by Brand" type="bar">
+                <field name="brand_id" type="row"/>
+                <field name="id" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Allocation action -->
+    <record id="action_barcode_allocation" model="ir.actions.act_window">
+        <field name="name">Allocation History</field>
+        <field name="res_model">mml.barcode.allocation</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Allocation graph action -->
+    <record id="action_barcode_allocation_graph" model="ir.actions.act_window">
+        <field name="name">Allocations by Brand</field>
+        <field name="res_model">mml.barcode.allocation</field>
+        <field name="view_mode">graph</field>
+    </record>
+</odoo>
