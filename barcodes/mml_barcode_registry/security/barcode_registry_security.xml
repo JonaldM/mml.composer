@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Company-scoped record rules for all barcode models -->
+    <record id="rule_barcode_registry_company" model="ir.rule">
+        <field name="name">Barcode Registry: company</field>
+        <field name="model_id" ref="model_mml_barcode_registry"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_barcode_allocation_company" model="ir.rule">
+        <field name="name">Barcode Allocation: company</field>
+        <field name="model_id" ref="model_mml_barcode_allocation"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_barcode_prefix_company" model="ir.rule">
+        <field name="name">Barcode Prefix: company</field>
+        <field name="model_id" ref="model_mml_barcode_prefix"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_mml_brand_company" model="ir.rule">
+        <field name="name">MML Brand: company</field>
+        <field name="model_id" ref="model_mml_brand"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+</odoo>
