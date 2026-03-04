@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        MML Consumer Products primary GS1 prefix.
+        897 of 1,000 slots allocated as of 2026-03-04. Sequences start at 11999.
+        Run "Generate Sequences" after install to populate the registry pool.
+        noupdate="1" — this record will not be overwritten on module upgrade.
+    -->
+    <record id="barcode_prefix_mml_primary" model="mml.barcode.prefix">
+        <field name="name">MML Primary</field>
+        <field name="prefix">9419416</field>
+        <field name="sequence_start">11999</field>
+        <field name="sequence_end">99999</field>
+        <field name="priority">10</field>
+        <field name="active">True</field>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+</odoo>
