@@ -22,7 +22,6 @@ class ProductProduct(models.Model):
         help='True if product.barcode is tracked in the registry',
     )
 
-    @api.depends()
     def _compute_barcode_allocation_id(self):
         Allocation = self.env['mml.barcode.allocation']
         for product in self:
@@ -52,7 +51,7 @@ class ProductProduct(models.Model):
             return res
 
         Allocation = self.env['mml.barcode.allocation']
-        if not vals['active']:
+        if vals['active'] is False:
             # Product archived → set active allocations dormant
             active_allocs = Allocation.search([
                 ('product_id', 'in', self.ids),
