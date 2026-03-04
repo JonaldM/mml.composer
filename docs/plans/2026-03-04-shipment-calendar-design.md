@@ -57,17 +57,33 @@ freight_last_update: Datetime
 
 Populated via `mml.registry.service('freight')`. Returns empty if `mml_freight` not installed — no conditional XML needed. Calendar card uses `invisible="not freight_eta"`.
 
-### Forward plan context (sidebar)
+### Warehouse receiving capacity
 
-Forward plan lines (`roq.forward.plan.line`) are **not** rendered on the calendar. Instead, a collapsible sidebar panel shows an aggregated demand coverage table:
+New fields on `stock.warehouse` (in existing `stock_warehouse_ext.py`):
 
-- Rows: suppliers
-- Columns: rolling 6-month window (by month)
-- Each cell: planned CBM from forward plan lines for that supplier/month
+```python
+roq_weekly_capacity_cbm: Float    # max CBM arriving per week
+roq_weekly_capacity_teu: Float    # max TEU arriving per week (1 TEU = 1×20GP; 40GP/40HQ = 2 TEU)
+roq_capacity_unit: Selection([('cbm', 'CBM'), ('teu', 'TEU')])
+```
+
+Container → TEU mapping: `20GP = 1.0`, `40GP = 2.0`, `40HQ = 2.0`, `LCL = 0` (weight-based, exempt).
+
+### Forward plan context (coverage map)
+
+Forward plan lines (`roq.forward.plan.line`) are **not** rendered on the calendar. Instead, a standalone **Coverage Map** view is accessible via a button in the calendar control panel. It is implemented as a list view on a new `roq.warehouse.week.load` computed model (or aggregated via a pivot view — see implementation plan).
+
+**Primary axis:** warehouse receiving load over time.
+
+- Rows: warehouses
+- Columns: rolling 8-week window
+- Each cell: scheduled CBM (or TEU) arriving that week vs. warehouse weekly capacity
 - Cell colour:
-  - **Red** — no covering shipment group in that month
-  - **Amber** — covering group exists but fill < 70%
-  - **Clear** — adequately covered
+  - **Green** — < 70% of capacity
+  - **Amber** — 70–90% of capacity
+  - **Red** — > 90% of capacity
+
+This is the primary saturation signal. The planner sees Hamilton week 12 is red → drags a shipment earlier or later → cell recalculates → consolidation wizard fires if the move lands near a same-supplier group.
 
 This is a read-only computed summary. Not draggable.
 
@@ -93,6 +109,7 @@ This is a read-only computed summary. Not draggable.
 ### Calendar card content
 
 - Shipment group name (SG-2026-0042)
+- Destination warehouse abbreviations (HLZ · CHC or AKL · AUS for multi-warehouse groups)
 - Supplier(s): first supplier name + overflow count if consolidated ("Supplier A +2")
 - Container type + fill % (40HQ · 87%)
 - Freight ETA + last status if `mml_freight` installed ("ETA 12 Mar · In Transit")
@@ -170,13 +187,14 @@ Server method: `action_reschedule(new_delivery_date)` on `roq.shipment.group`.
 
 | File | Action |
 |---|---|
-| `mml_roq_forecast/views/roq_shipment_calendar_views.xml` | New — calendar view + sidebar |
+| `mml_roq_forecast/views/roq_shipment_calendar_views.xml` | New — calendar view + coverage map view |
+| `mml_roq_forecast/views/roq_reschedule_wizard_views.xml` | New — consolidation suggestion wizard |
 | `mml_roq_forecast/views/menus.xml` | Add calendar menu entry |
-| `mml_roq_forecast/models/roq_shipment_group.py` | Add `freight_eta`, `freight_status`, `freight_last_update` computed fields; add `action_reschedule()` method |
-| `mml_roq_forecast/models/roq_forward_plan.py` | Add demand coverage summary computed field for sidebar |
-| `mml_roq_forecast/__manifest__.py` | Add new view file to `data` list |
-
-### No new models required.
+| `mml_roq_forecast/models/roq_shipment_group.py` | Add freight computed fields; `action_reschedule()`; `write()` override |
+| `mml_roq_forecast/models/roq_reschedule_wizard.py` | New — `roq.reschedule.wizard` TransientModel |
+| `mml_roq_forecast/models/roq_warehouse_week_load.py` | New — `roq.warehouse.week.load` computed model for coverage map |
+| `mml_roq_forecast/models/stock_warehouse_ext.py` | Add `roq_weekly_capacity_cbm`, `roq_weekly_capacity_teu`, `roq_capacity_unit` |
+| `mml_roq_forecast/__manifest__.py` | Add new files to `data` list |
 
 ---
 
