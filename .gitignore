@@ -44,3 +44,7 @@ filestore/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Working documents (not source)
+barcodes/*.docx
+docs/preview/
