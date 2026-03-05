@@ -1,0 +1,9 @@
+# MML Odoo Apps — Python dependencies required before installing any MML module.
+# Install with: pip install -r requirements.txt
+
+# stock_3pl_core / stock_3pl_mainfreight — SFTP transport layer
+paramiko>=2.10.0
+
+# mml_roq_forecast — statistical forecasting (demand curves, safety stock)
+numpy>=1.24.0
+scipy>=1.10.0

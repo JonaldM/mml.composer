@@ -5,6 +5,18 @@
 
 ---
 
+## Pre-Installation
+
+### 1. Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+This installs: `paramiko` (SFTP for 3PL and EDI transports), `numpy` and `scipy` (ROQ demand forecasting).
+
+---
+
 ## Module Install Order
 
 Install in this exact sequence. Odoo respects `depends[]` but explicit ordering prevents partial upgrades causing install failures.
