@@ -42,3 +42,20 @@ class TestServiceRegistry(TransactionCase):
         self.env['mml.registry'].deregister('_test_freight')
         svc = self.env['mml.registry'].service('_test_freight')
         self.assertIsNone(svc.create_tender({}))
+
+    def test_service_rehydrates_after_registry_cleared(self):
+        """Simulate forked worker: clear in-process dict, service() must still work."""
+        from odoo.addons.mml_base.models import mml_registry as reg_module
+
+        class _DummyService:
+            def __init__(self, env):
+                self.env = env
+            def is_null(self):
+                return False
+
+        self.env['mml.registry'].register('test_rehydrate', _DummyService)
+        # Simulate worker fork: wipe the in-process dict
+        reg_module._SERVICE_REGISTRY.clear()
+        # service() must re-hydrate from DB and return a working instance
+        svc = self.env['mml.registry'].service('test_rehydrate')
+        self.assertFalse(svc.is_null(), "Expected real service, got NullService after re-hydration")
