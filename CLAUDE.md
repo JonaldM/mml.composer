@@ -6,7 +6,7 @@
 
 MML Consumer Products Ltd is a New Zealand-based distribution company. We distribute ~400 SKUs across 5 brands (Volere, Annabel Langbein, Enkel, Enduro, Rufus & Coco) to major NZ/AU retail chains. We run a self-hosted Odoo 19 instance.
 
-**This is not a SaaS product. This is internal operational infrastructure for a real distribution business.** Every module must be production-safe, auditable, and designed for a small ops team (not engineers) to use day-to-day.
+**Currently deployed as internal operational infrastructure for MML Consumer Products. Architecture is being built with a SaaS pivot in mind — each module is a sellable, independently installable Odoo app.** Every module must be production-safe, auditable, and designed for a small ops team (not engineers) to use day-to-day.
 
 ---
 
@@ -170,7 +170,7 @@ Architecture must support adding new partners via configuration, not code. Each 
 - Model naming: `mml.3pl.despatch`, `mml.freight.shipment`, `mml.edi.document`
 - Security: `ir.model.access.csv` + record rules per module
 - Views: form, tree, kanban for pipeline/status views
-- Menus: nested under top-level "MML Operations" menu
+- Menus: each module is a **standalone Odoo app** — own root menuitem (no `parent=`), own `web_icon`, `application = True` in manifest. Bridge/platform modules (`mml_base`, `mml_roq_freight`, `mml_freight_3pl`) are exceptions: `application = False`, no menu.
 
 ### API Integration Pattern
 - All external API calls via `mml.api.client` base class
