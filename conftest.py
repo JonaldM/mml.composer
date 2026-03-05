@@ -180,8 +180,14 @@ def _install_odoo_stubs():
     odoo_http.request = None
 
     # ---- odoo (root) ----
+    # ---- odoo translation stub ----
+    def _(s):
+        """No-op translation stub."""
+        return s
+
     odoo = types.ModuleType('odoo')
     odoo._stubbed = True
+    odoo._ = _
     odoo.models = odoo_models
     odoo.fields = odoo_fields
     odoo.api = odoo_api
