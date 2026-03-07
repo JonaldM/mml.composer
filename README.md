@@ -117,12 +117,14 @@ mml_freight  stock_3pl_core  mml_roq_forecast  mml_edi  mml_barcode_registry
 
 Odoo core (base, product, sale, purchase, account, mail)
          |
-  mml_forecast_core            ← independent of mml_base
+     mml_base
+         |
+  mml_forecast_core
     /           \
 mml_forecast_demand   mml_forecast_financial
 ```
 
-> **Note:** The forecasting suite (`mml_forecast_*`) does **not** depend on `mml_base`. It is a self-contained suite with its own shared core (`mml_forecast_core`). All other operational modules (`mml_freight`, `stock_3pl_*`, `mml_edi`, `mml_barcode_registry`, `mml_roq_forecast`) depend on `mml_base`.
+> **Note:** All modules — including the forecasting suite — depend on `mml_base`. `mml_forecast_core` declares `mml_base` in its `depends` list alongside `base`, `product`, `sale`, `purchase`, `account`, and `mail`.
 
 ---
 
@@ -198,15 +200,15 @@ $ODOO -d $DB -i mml_edi,mml_barcode_registry --stop-after-init
 | `mml_edi` | `briscoes.edi/mml.edi/` | True | `mml_base`, `sale`, `account`, `stock`, `mail` | EDI for retail partners |
 | `mml_barcode_registry` | `barcodes/mml_barcode_registry/` | True | `mml_base`, `stock`, `product`, `mail` | GTIN lifecycle management and allocation |
 | `mml_roq_forecast` | `roq.model/mml_roq_forecast/` | True | `mml_base` | Legacy ROQ demand engine — superseded by `mml_forecast_demand` |
-| `mml_forecast_core` | `mml.forecasting/mml_forecast_core/` | **True** | `base`, `product`, `sale`, `purchase`, `account`, `mail` | Forecasting suite shared infra — FX rates, origin ports, config, terms |
+| `mml_forecast_core` | `mml.forecasting/mml_forecast_core/` | **True** | `mml_base`, `base`, `product`, `sale`, `purchase`, `account`, `mail` | Forecasting suite shared infra — FX rates, origin ports, config, terms |
 | `mml_forecast_demand` | `mml.forecasting/mml_forecast_demand/` | False | `mml_forecast_core` | ROQ demand engine (migrated from `mml_roq_forecast`) |
-| `mml_forecast_financial` | `mml.forecasting/mml_forecast_financial/` | False | `mml_forecast_core`, `account` | P&L and cashflow financial forecasting |
+| `mml_forecast_financial` | `mml.forecasting/mml_forecast_financial/` | False | `mml_base`, `mml_forecast_core`, `account` | P&L and cashflow financial forecasting |
 
 ---
 
 ## Forecasting Suite Detail
 
-The `mml.forecasting` repo is a standalone git repository at `mml.forecasting/`. It does **not** use `mml_base` — the suite has its own shared core.
+The `mml.forecasting` repo is a standalone git repository at `mml.forecasting/`. It depends on `mml_base` for the platform layer; `mml_forecast_core` is the shared forecasting infrastructure that both sub-modules depend on.
 
 ### Module roles
 
