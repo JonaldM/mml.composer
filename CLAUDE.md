@@ -19,32 +19,33 @@ MML Consumer Products Ltd is a New Zealand-based distribution company (~400 SKUs
 
 ```
 mml.odoo.apps/
-├── CLAUDE.md                          ← Root context (you are here)
-├── mml_base/                          ← Platform layer (event bus, capability registry, billing ledger)
-├── mml_roq_freight/                   ← Bridge: ROQ ↔ Freight schema bridge (auto_install)
-├── mml_freight_3pl/                   ← Bridge: Freight ↔ 3PL schema bridge (auto_install)
-├── fowarder.intergration/             ← Freight forwarding modules
+├── CLAUDE.md                            ← Root context (you are here)
+├── mml_base/                            ← Platform layer (event bus, capability registry, billing ledger)
+├── mml_roq_freight/                     ← Bridge: ROQ ↔ Freight schema bridge (auto_install)
+├── mml_freight_3pl/                     ← Bridge: Freight ↔ 3PL schema bridge (auto_install)
+├── mml.fowarder.intergration/           ← Freight forwarding modules
 │   └── addons/
-│       ├── mml_freight/               ← Core freight orchestration (tender, quote, booking, tracking)
-│       ├── mml_freight_dsv/           ← DSV carrier adapter (Generic API + XPress)
-│       ├── mml_freight_knplus/        ← Kuehne+Nagel adapter
-│       ├── mml_freight_mainfreight/   ← Mainfreight freight adapter
-│       └── mml_freight_demo/          ← Demo data for freight
-├── mainfreight.3pl.intergration/      ← Mainfreight 3PL warehouse integration
+│       ├── mml_freight/                 ← Core freight orchestration (tender, quote, booking, tracking)
+│       ├── mml_freight_dsv/             ← DSV carrier adapter (Generic API + XPress)
+│       ├── mml_freight_knplus/          ← Kuehne+Nagel adapter
+│       ├── mml_freight_mainfreight/     ← Mainfreight freight adapter
+│       └── mml_freight_demo/            ← Demo data for freight
+├── mml.3pl.intergration/                ← Mainfreight 3PL warehouse integration
 │   └── addons/
-│       ├── stock_3pl_core/            ← Forwarder-agnostic 3PL platform layer
-│       └── stock_3pl_mainfreight/     ← Mainfreight implementation
-├── roq.model/
-│   └── mml_roq_forecast/              ← Demand forecasting, ROQ calculation, 12-month shipment plan
-├── briscoes.edi/                      ← Legacy .NET EDI service (compiled binaries, no Odoo module here)
-├── barcodes/
-│   └── mml_barcode_registry/          ← Barcode registry module
+│       ├── stock_3pl_core/              ← Forwarder-agnostic 3PL platform layer
+│       └── stock_3pl_mainfreight/       ← Mainfreight implementation
+├── mml.roq.model/
+│   └── mml_roq_forecast/               ← Demand forecasting, ROQ calculation, 12-month shipment plan
+├── mml.edi/                             ← EDI engine (Odoo module) + legacy .NET binaries
+│   └── mml_edi/                         ← mml_edi Odoo module (module root is mml.edi/ itself)
+├── mml.barcodes/
+│   └── mml_barcode_registry/            ← Barcode registry module
 └── mml.forecasting/
-    ├── mml_forecast_core/             ← Core forecasting engine
-    └── mml_forecast_financial/        ← Financial forecasting layer
+    ├── mml_forecast_core/               ← Core forecasting engine
+    └── mml_forecast_financial/          ← Financial forecasting layer
 ```
 
-**Note on typos:** `fowarder.intergration` and `mainfreight.3pl.intergration` are intentional directory names (typos preserved to match repo history).
+**Note on typos:** `mml.fowarder.intergration` and `mml.3pl.intergration` are intentional directory names (typos preserved from original repo history).
 
 ---
 
@@ -54,8 +55,8 @@ mml.odoo.apps/
 ```bash
 pip install -r requirements.txt
 # Per-workspace:
-pip install -r mainfreight.3pl.intergration/requirements.txt
-pip install -r roq.model/requirements.txt
+pip install -r mml.3pl.intergration/requirements.txt
+pip install -r mml.roq.model/requirements.txt
 ```
 
 ### Run pure-Python tests (no Odoo needed — fast, use these during development)
@@ -63,13 +64,14 @@ pip install -r roq.model/requirements.txt
 # All pure-Python tests across the repo
 pytest -m "not odoo_integration" -q
 
-# Single module
-pytest mainfreight.3pl.intergration/ -m "not odoo_integration" -q
-pytest fowarder.intergration/ -m "not odoo_integration" -q
-pytest roq.model/ -m "not odoo_integration" -q
+# Single workspace
+pytest mml.3pl.intergration/ -m "not odoo_integration" -q
+pytest mml.fowarder.intergration/ -m "not odoo_integration" -q
+pytest mml.roq.model/ -m "not odoo_integration" -q
+pytest mml.forecasting/ -m "not odoo_integration" -q
 
 # Single test file
-pytest mainfreight.3pl.intergration/addons/stock_3pl_mainfreight/tests/test_route_engine.py -q
+pytest mml.3pl.intergration/addons/stock_3pl_mainfreight/tests/test_route_engine.py -q
 ```
 
 ### Run Odoo integration tests (requires live Odoo database)
@@ -96,7 +98,7 @@ The repo uses a **two-tier test strategy**:
 
 The root `conftest.py` installs lightweight Odoo stubs (`odoo.models`, `odoo.fields`, `odoo.api`, `odoo.exceptions`, `odoo.http`, `odoo.tests`) into `sys.modules` so pure-Python tests can import Odoo model classes without a running Odoo instance. Tests inheriting from `odoo.tests.TransactionCase` are auto-marked `odoo_integration` and silently skipped under plain `pytest`.
 
-Each workspace (`fowarder.intergration/`, `mainfreight.3pl.intergration/`, `roq.model/`, `briscoes.edi/`) has its own `pytest.ini` with the same marker definition so tests can be run from within that workspace directory.
+Each workspace (`mml.fowarder.intergration/`, `mml.3pl.intergration/`, `mml.roq.model/`, `mml.edi/`, `mml.forecasting/`) has its own `pytest.ini` with the same marker definition so tests can be run from within that workspace directory.
 
 ---
 
@@ -137,8 +139,8 @@ Three-layer system: (1) Per-SKU ABCD classification + SMA/EWMA/Holt-Winters dema
 - `mml_roq_freight` — schema bridge between ROQ ↔ Freight (`auto_install`, `application = False`)
 - `mml_freight_3pl` — schema bridge between Freight ↔ 3PL (`auto_install`, `application = False`)
 
-### `briscoes.edi/`
-**Not an Odoo module.** A deployed .NET Framework 4.8 Windows service (`BriscoesEditOrder`) that polls EDIS VAN FTP (`post.edis.co.nz`) every 15 min, parses Briscoes POs, and creates Odoo SOs via XML-RPC. Source is in a separate repo; only compiled binaries are here. Config is entirely in `*.exe.config`.
+### `mml.edi/`
+**Contains two systems:** (1) `mml_edi` — the active Odoo 19 Python EDI module (customer-agnostic EDI engine). (2) Legacy .NET Framework 4.8 Windows service (`BriscoesEditOrder`) compiled binaries — polls EDIS VAN FTP (`post.edis.co.nz`) every 15 min, parses Briscoes POs, creates Odoo SOs via XML-RPC. Config entirely in `*.exe.config`. Source in a separate repo.
 
 ---
 
@@ -172,6 +174,3 @@ Modules communicate via shared Odoo models, chatter (`mail.message`), and comput
 
 ### ERP Agnosticism
 Business logic lives in pure-Python `services/` classes (no `self.env`). Odoo models are thin adapters. This is intentional — future SAP/SAGE adapters call the same service layer.
-
-### Known Issues / Backlog
-- `freight_booking.py` `action_confirm()` operates on a recordset but calls `_build_inward_order_payload()` which calls `ensure_one()` internally — will raise `ValueError` if called on >1 record. Fix: add `ensure_one()` to `action_confirm()` or loop per record.
