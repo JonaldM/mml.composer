@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Registry list view -->
+    <record id="view_barcode_registry_tree" model="ir.ui.view">
+        <field name="name">mml.barcode.registry.tree</field>
+        <field name="model">mml.barcode.registry</field>
+        <field name="arch" type="xml">
+            <list decoration-success="status == 'in_use'"
+                  decoration-warning="status == 'reserved'"
+                  decoration-muted="status in ('retired',)"
+                  default_order="sequence asc">
+                <field name="gtin_13" class="font-monospace fw-semibold"/>
+                <field name="gtin_14" class="font-monospace text-muted" optional="show"/>
+                <field name="current_allocation_id"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'in_use'"
+                       decoration-warning="status == 'reserved'"
+                       decoration-info="status == 'unallocated'"
+                       decoration-muted="status == 'retired'"/>
+                <field name="prefix_id"/>
+                <field name="reuse_eligible_date" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Registry form view -->
+    <record id="view_barcode_registry_form" model="ir.ui.view">
+        <field name="name">mml.barcode.registry.form</field>
+        <field name="model">mml.barcode.registry</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_reserve" string="Reserve"
+                            type="object" class="btn-primary"
+                            invisible="status != 'unallocated'"/>
+                    <button name="action_unreserve" string="Unreserve"
+                            type="object"
+                            invisible="status != 'reserved'"/>
+                    <button name="action_retire" string="Retire"
+                            type="object"
+                            invisible="status != 'in_use'"/>
+                    <button name="action_return_to_pool" string="Return to Pool"
+                            type="object"
+                            invisible="status != 'retired'"/>
+                    <field name="status" widget="statusbar"
+                           statusbar_visible="unallocated,in_use,retired"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="GTIN Numbers">
+                            <field name="sequence" class="font-monospace"/>
+                            <field name="gtin_13" class="font-monospace fw-bold fs-5"/>
+                            <field name="gtin_14" class="font-monospace"/>
+                            <field name="check_digit"/>
+                        </group>
+                        <group string="Assignment">
+                            <field name="prefix_id"/>
+                            <field name="current_allocation_id"/>
+                            <field name="reuse_eligible_date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Allocation History" name="allocation_history">
+                            <field name="allocation_ids" readonly="1">
+                                <list decoration-success="status == 'active'"
+                                      decoration-warning="status == 'dormant'"
+                                      decoration-muted="status == 'discontinued'">
+                                    <field name="product_id"/>
+                                    <field name="brand_id"/>
+                                    <field name="status" widget="badge"
+                                           decoration-success="status == 'active'"
+                                           decoration-warning="status == 'dormant'"
+                                           decoration-muted="status == 'discontinued'"/>
+                                    <field name="allocation_date"/>
+                                    <field name="discontinue_date" optional="show"/>
+                                    <field name="reuse_eligible_date" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Registry search view -->
+    <record id="view_barcode_registry_search" model="ir.ui.view">
+        <field name="name">mml.barcode.registry.search</field>
+        <field name="model">mml.barcode.registry</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="gtin_13" string="GTIN-13"/>
+                <field name="gtin_14" string="GTIN-14"/>
+                <field name="prefix_id"/>
+                <filter string="Unallocated" name="unallocated"
+                        domain="[('status', '=', 'unallocated')]"/>
+                <filter string="In Use" name="in_use"
+                        domain="[('status', '=', 'in_use')]"/>
+                <filter string="Reserved" name="reserved"
+                        domain="[('status', '=', 'reserved')]"/>
+                <filter string="Retired" name="retired"
+                        domain="[('status', '=', 'retired')]"/>
+                <filter string="Reuse Eligible" name="reuse_eligible"
+                        domain="[('status', '=', 'retired'), ('reuse_eligible_date', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="1" string="Group By">
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Prefix" name="group_prefix" context="{'group_by': 'prefix_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Registry graph view (status breakdown) -->
+    <record id="view_barcode_registry_graph" model="ir.ui.view">
+        <field name="name">mml.barcode.registry.graph</field>
+        <field name="model">mml.barcode.registry</field>
+        <field name="arch" type="xml">
+            <graph string="Registry Status Breakdown" type="pie">
+                <field name="status" type="row"/>
+                <field name="id" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Registry action — grouped by status by default -->
+    <record id="action_barcode_registry" model="ir.actions.act_window">
+        <field name="name">Barcode Registry</field>
+        <field name="res_model">mml.barcode.registry</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_status': 1}</field>
+    </record>
+
+    <!-- Registry status graph action -->
+    <record id="action_barcode_registry_graph" model="ir.actions.act_window">
+        <field name="name">Status Breakdown</field>
+        <field name="res_model">mml.barcode.registry</field>
+        <field name="view_mode">graph</field>
+    </record>
+</odoo>
