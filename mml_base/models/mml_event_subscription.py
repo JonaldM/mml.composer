@@ -11,6 +11,7 @@ _HANDLER_METHOD_RE = re.compile(r'^_on_[a-z_]+$')
 class MmlEventSubscription(models.Model):
     _name = 'mml.event.subscription'
     _description = 'MML Event Subscription'
+    _rec_name = 'event_type'
 
     _sql_constraints = [
         (

@@ -17,5 +17,4 @@ def post_init_hook(env):
 def uninstall_hook(env):
     """Deregister all mml_base entries on uninstall."""
     env['mml.capability'].deregister_module('mml_base')
-    env['mml.registry'].deregister('base')
     env['mml.event.subscription'].deregister_module('mml_base')

@@ -9,6 +9,7 @@ _logger = logging.getLogger(__name__)
 class MmlLicense(models.Model):
     _name = 'mml.license'
     _description = 'MML License Cache'
+    _rec_name = 'org_ref'
 
     org_ref = fields.Char(help='Organisation identifier from the MML platform')
     license_key = fields.Char(

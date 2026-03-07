@@ -5,13 +5,13 @@ from odoo import api, fields, models
 class MmlEvent(models.Model):
     _name = 'mml.event'
     _description = 'MML Event Ledger'
+    _rec_name = 'event_type'
     _order = 'timestamp desc'
 
     company_id = fields.Many2one(
         'res.company', required=True, default=lambda self: self.env.company
     )
     instance_ref = fields.Char(
-        store=True,
         help='Identifies the Odoo instance for multi-instance billing',
     )
     event_type = fields.Char(required=True, index=True)
