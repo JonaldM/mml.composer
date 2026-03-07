@@ -23,29 +23,38 @@ class Mml3plBridge(models.AbstractModel):
         if not event.res_id:
             return
 
-        booking = self.env['freight.booking'].browse(event.res_id)
-        if not booking.exists():
-            return
-        if not booking.po_ids:
-            return
+        try:
+            booking = self.env['freight.booking'].browse(event.res_id)
+            if not booking.exists():
+                return
+            if not booking.po_ids:
+                return
 
-        svc = self.env['mml.registry'].service('3pl')
-        for po in booking.po_ids:
-            msg_id = svc.queue_inward_order(po.id)
-            if msg_id:
-                _logger.info(
-                    '3PL bridge: queued inward order for PO id=%s, msg_id=%s', po.id, msg_id
-                )
-                self.env['mml.event'].emit(
-                    '3pl.inbound.queued',
-                    quantity=1,
-                    billable_unit='3pl_receipt',
-                    res_model='purchase.order',
-                    res_id=po.id,
-                    source_module='mml_freight_3pl',
-                )
-            else:
-                _logger.warning(
-                    '3PL bridge: queue_inward_order returned no message ID for PO id=%s — '
-                    'billing event NOT emitted', po.id,
-                )
+            svc = self.env['mml.registry'].service('3pl')
+            for po in booking.po_ids:
+                msg_id = svc.queue_inward_order(po.id)
+                if msg_id:
+                    _logger.info(
+                        '3PL bridge: queued inward order for PO id=%s, msg_id=%s', po.id, msg_id
+                    )
+                    self.env['mml.event'].emit(
+                        '3pl.inbound.queued',
+                        quantity=1,
+                        billable_unit='3pl_receipt',
+                        res_model='purchase.order',
+                        res_id=po.id,
+                        source_module='mml_freight_3pl',
+                    )
+                else:
+                    _logger.warning(
+                        '3PL bridge: queue_inward_order returned no message ID for PO id=%s — '
+                        'billing event NOT emitted', po.id,
+                    )
+        except Exception as exc:
+            _logger.warning(
+                "mml_roq_freight: _on_freight_booking_confirmed failed for event %s: %s",
+                event.id if hasattr(event, 'id') else '?',
+                exc,
+                exc_info=True,
+            )
+            return

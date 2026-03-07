@@ -61,5 +61,14 @@ class MmlRoqFreightBridge(models.AbstractModel):
         """
         if not event.res_id:
             return
-        svc = self.env['mml.registry'].service('roq')
-        svc.on_freight_booking_confirmed(event)
+        try:
+            svc = self.env['mml.registry'].service('roq')
+            svc.on_freight_booking_confirmed(event)
+        except Exception as exc:
+            _logger.warning(
+                "mml_roq_freight: _on_freight_booking_confirmed failed for event %s: %s",
+                event.id if hasattr(event, 'id') else '?',
+                exc,
+                exc_info=True,
+            )
+            return
