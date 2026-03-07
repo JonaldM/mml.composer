@@ -16,9 +16,6 @@ _PARAM_PREFIX = 'mml_registry.service.'
 _ALLOWED_SERVICE_PREFIXES = (
     'odoo.addons.mml_',
     'odoo.addons.stock_3pl_',
-    'odoo.addons.mml_edi',
-    'mml_edi.',
-    'mml_base.',
 )
 
 

@@ -11,6 +11,10 @@ class NullService:
         """Stub: NullService is never available — the real module is not installed."""
         return False
 
+    def is_null(self):
+        """Returns True — callers can use this to detect a missing service."""
+        return True
+
     def get_booking_status(self, shipment_group_id):
         """Stub: mml_freight not installed — no booking status available."""
         return None
