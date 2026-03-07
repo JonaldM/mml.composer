@@ -23,15 +23,16 @@ Install in this exact sequence. Odoo respects `depends[]` but explicit ordering 
 
 1. `mml_base`
 2. `mml_forecast_core`
-3. `mml_barcode_registry`
-4. `mml_forecast_financial`
-5. `mml_freight` → then `mml_freight_dsv`, `mml_freight_knplus`, `mml_freight_mainfreight`
-6. `stock_3pl_core` → then `stock_3pl_mainfreight`
-7. `mml_freight_3pl` (bridge — `auto_install=True`, verify it activates)
-8. `mml_roq_forecast` → then `mml_roq_freight` bridge (auto_install)
-9. `mml_edi` (directory must be named `mml_edi` in the Odoo addons path — currently named `briscoes.edi` in the repo; symlink or rename before installing)
+3. `mml_forecast_financial`
+4. `mml_freight` → then `mml_freight_dsv`, `mml_freight_knplus`, `mml_freight_mainfreight`
+5. `stock_3pl_core` → then `stock_3pl_mainfreight`
+6. `mml_freight_3pl` (bridge — `auto_install=True`, verify it activates)
+7. `mml_roq_forecast` → then `mml_roq_freight` bridge (auto_install)
+8. `mml_edi` (directory must be named `mml_edi` in the Odoo addons path — currently named `briscoes.edi` in the repo; symlink or rename before installing)
 
 **Do NOT install:** `mml_freight_demo` (`installable=False`)
+
+**Note:** `mml_barcode_registry` has been migrated to the separate `mml.barcodes` git repo. It is **not** part of this mono-repo install sequence. Install it independently from that repo if required.
 
 ---
 
@@ -49,6 +50,7 @@ Set in **Settings → Technical → System Parameters** before go-live:
 | `mml_freight_dsv.api_url` | `https://api.dsv.com` | DSV API base URL |
 | `mml_registry.service.edi` | _(auto-set on install)_ | Set by mml_edi post_init_hook |
 | `mml_registry.service.roq` | _(auto-set on install)_ | Set by mml_roq_forecast post_init_hook |
+| `mml_freight.freight_cost_product_id` | `<product ID>` | ID of the Odoo service product used as the freight landed cost component. Create a Service-type product named "Freight Cost" in Odoo, then set its numeric database ID here. Required for landed cost allocation at delivery. |
 
 ---
 
@@ -115,12 +117,6 @@ Run through this on **ODOOTEST** database before touching production.
 - [ ] Confirm picking updated (not rejected)
 - [ ] Confirm cron alert email fires when an error is injected
 
-### Barcode Registry
-- [ ] Install mml_barcode_registry
-- [ ] Allocate a GTIN to a test product
-- [ ] Confirm GTIN appears on product form smart button
-- [ ] Import XLSX with test barcodes — confirm check digit validation rejects invalid rows
-
 ---
 
 ## Cron Alert Configuration
@@ -162,3 +158,4 @@ If critical issues found post-install:
 - `roq.model/`, `fowarder.intergration/`, `mainfreight.3pl.intergration/`, `mml.forecasting/` are separate git repos nested inside the workspace — each has its own `.git/`. Deploy scripts must handle each separately.
 - `mml_forecast_demand` has been deleted — do not attempt to install it.
 - `mml_freight_demo` has `installable=False` — it will not appear as installable on the home screen.
+- **3PL crons are installed `active=False`** — after `stock_3pl_mainfreight` installs, manually enable these three in **Settings → Technical → Automation → Scheduled Actions**: `MF Push Cron`, `MF Inbound Cron`, `MF Tracking Cron`. They are deliberately inactive at install to prevent accidental syncs before credentials are configured.
