@@ -11,6 +11,16 @@ _SERVICE_REGISTRY: dict[str, type] = {}
 
 _PARAM_PREFIX = 'mml_registry.service.'
 
+# Allowlist of module path prefixes that may be dynamically imported as services.
+# Only Odoo add-on packages from this project are trusted.
+_ALLOWED_SERVICE_PREFIXES = (
+    'odoo.addons.mml_',
+    'odoo.addons.stock_3pl_',
+    'odoo.addons.mml_edi',
+    'mml_edi.',
+    'mml_base.',
+)
+
 
 class MmlRegistry(models.AbstractModel):
     _name = 'mml.registry'
@@ -58,6 +68,15 @@ class MmlRegistry(models.AbstractModel):
             return None
         try:
             module_path, class_name = class_path.rsplit('.', 1)
+            # Security: only allow imports from trusted MML/Odoo module prefixes.
+            # Prevents arbitrary code execution via ir.config_parameter tampering.
+            if not any(module_path.startswith(prefix) for prefix in _ALLOWED_SERVICE_PREFIXES):
+                _logger.error(
+                    'mml.registry: refusing to re-hydrate service %r — module path %r '
+                    'is outside the allowed prefix list. Possible ir.config_parameter tampering.',
+                    service_name, module_path,
+                )
+                return None
             module = importlib.import_module(module_path)
             cls = getattr(module, class_name)
             _SERVICE_REGISTRY[service_name] = cls
