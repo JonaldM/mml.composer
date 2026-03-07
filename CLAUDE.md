@@ -1,202 +1,177 @@
-# MML Consumer Products — Odoo Module Architecture
+# CLAUDE.md
 
-> **For Claude:** Read this file first before touching any module. It defines intent, boundaries, and wiring.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> Read this file first before touching any module. It defines intent, boundaries, and wiring.
+> Each subdirectory also has its own `CLAUDE.md` with module-specific detail — read both.
+
+---
 
 ## Company Context
 
-MML Consumer Products Ltd is a New Zealand-based distribution company. We distribute ~400 SKUs across 5 brands (Volere, Annabel Langbein, Enkel, Enduro, Rufus & Coco) to major NZ/AU retail chains. We run a self-hosted Odoo 19 instance.
+MML Consumer Products Ltd is a New Zealand-based distribution company (~400 SKUs, 5 brands: Volere, Annabel Langbein, Enkel, Enduro, Rufus & Coco) selling to major NZ/AU retail chains. Self-hosted Odoo 19.
 
-**Currently deployed as internal operational infrastructure for MML Consumer Products. Architecture is being built with a SaaS pivot in mind — each module is a sellable, independently installable Odoo app.** Every module must be production-safe, auditable, and designed for a small ops team (not engineers) to use day-to-day.
+**Architecture goal:** Each `mml_*` module is a standalone, independently installable Odoo app — a sellable SaaS product. All must be production-safe, auditable, and operable by a small non-technical ops team.
 
 ---
 
-## Module Map
+## Actual Directory Structure
 
 ```
-mml_odoo/
-├── CLAUDE.md                  ← You are here. Read this first.
-├── mml_3pl/                   ← Mainfreight 3PL warehouse integration
-├── mml_freight_forwarder/     ← DSV + multi-carrier freight forwarding with tender
-├── mml_edi/                   ← EDI integrations for retail partners
-└── .claude/                   ← Session context, scratchpad
+mml.odoo.apps/
+├── CLAUDE.md                          ← Root context (you are here)
+├── mml_base/                          ← Platform layer (event bus, capability registry, billing ledger)
+├── mml_roq_freight/                   ← Bridge: ROQ ↔ Freight schema bridge (auto_install)
+├── mml_freight_3pl/                   ← Bridge: Freight ↔ 3PL schema bridge (auto_install)
+├── fowarder.intergration/             ← Freight forwarding modules
+│   └── addons/
+│       ├── mml_freight/               ← Core freight orchestration (tender, quote, booking, tracking)
+│       ├── mml_freight_dsv/           ← DSV carrier adapter (Generic API + XPress)
+│       ├── mml_freight_knplus/        ← Kuehne+Nagel adapter
+│       ├── mml_freight_mainfreight/   ← Mainfreight freight adapter
+│       └── mml_freight_demo/          ← Demo data for freight
+├── mainfreight.3pl.intergration/      ← Mainfreight 3PL warehouse integration
+│   └── addons/
+│       ├── stock_3pl_core/            ← Forwarder-agnostic 3PL platform layer
+│       └── stock_3pl_mainfreight/     ← Mainfreight implementation
+├── roq.model/
+│   └── mml_roq_forecast/              ← Demand forecasting, ROQ calculation, 12-month shipment plan
+├── briscoes.edi/                      ← Legacy .NET EDI service (compiled binaries, no Odoo module here)
+├── barcodes/
+│   └── mml_barcode_registry/          ← Barcode registry module
+└── mml.forecasting/
+    ├── mml_forecast_core/             ← Core forecasting engine
+    └── mml_forecast_financial/        ← Financial forecasting layer
+```
+
+**Note on typos:** `fowarder.intergration` and `mainfreight.3pl.intergration` are intentional directory names (typos preserved to match repo history).
+
+---
+
+## Development Commands
+
+### Install Python dependencies
+```bash
+pip install -r requirements.txt
+# Per-workspace:
+pip install -r mainfreight.3pl.intergration/requirements.txt
+pip install -r roq.model/requirements.txt
+```
+
+### Run pure-Python tests (no Odoo needed — fast, use these during development)
+```bash
+# All pure-Python tests across the repo
+pytest -m "not odoo_integration" -q
+
+# Single module
+pytest mainfreight.3pl.intergration/ -m "not odoo_integration" -q
+pytest fowarder.intergration/ -m "not odoo_integration" -q
+pytest roq.model/ -m "not odoo_integration" -q
+
+# Single test file
+pytest mainfreight.3pl.intergration/addons/stock_3pl_mainfreight/tests/test_route_engine.py -q
+```
+
+### Run Odoo integration tests (requires live Odoo database)
+```bash
+# Install/update modules
+python odoo-bin -i stock_3pl_core,stock_3pl_mainfreight -d <db> --stop-after-init
+
+# Run tests via odoo-bin
+python odoo-bin --test-enable -u stock_3pl_core,stock_3pl_mainfreight -d <db> --stop-after-init
+python odoo-bin --test-enable -d <db> --test-tags mml_roq_forecast
+python odoo-bin --test-enable -d <db> --test-tags /mml_roq_forecast:TestAbcClassifier
 ```
 
 ---
 
-## Module 1: `mml_3pl` — Third-Party Logistics (Mainfreight)
+## Test Infrastructure
 
-**Intent:** Automate warehouse operations by integrating Odoo with Mainfreight's 3PL systems. Odoo is the source of truth for inventory and orders; Mainfreight is the physical execution layer.
+The repo uses a **two-tier test strategy**:
 
-**Core flows:**
-- Outbound: SO confirmed → despatch request to Mainfreight → pick/pack/ship → tracking returned → DO updated
-- Inbound: PO received at Mainfreight → receipt confirmation → stock levels updated in Odoo
-- Inventory sync: Periodic stock reconciliation between Mainfreight WMS and Odoo quants
+| Tier | Marker | Runner | What it tests |
+|------|--------|--------|---------------|
+| Pure-Python structural | *(no marker)* | `pytest` | Parsing, builders, field defs, service logic — no Odoo needed |
+| Odoo integration | `odoo_integration` | `odoo-bin --test-enable` | ORM operations requiring `self.env` |
 
-**Key design decisions:**
-- Async messaging (not real-time blocking API calls)
-- Mainfreight API responses create `mail.message` audit trail on SO/PO/DO
-- Stock discrepancies flagged but never auto-corrected without human review
-- Retry with exponential backoff; dead-letter queue for failed calls
+The root `conftest.py` installs lightweight Odoo stubs (`odoo.models`, `odoo.fields`, `odoo.api`, `odoo.exceptions`, `odoo.http`, `odoo.tests`) into `sys.modules` so pure-Python tests can import Odoo model classes without a running Odoo instance. Tests inheriting from `odoo.tests.TransactionCase` are auto-marked `odoo_integration` and silently skipped under plain `pytest`.
 
-**Depends on:** `stock`, `sale`, `purchase`
-**Aware of:** `mml_freight_forwarder` (freight costs → landed cost), `mml_edi` (EDI orders trigger 3PL despatch)
+Each workspace (`fowarder.intergration/`, `mainfreight.3pl.intergration/`, `roq.model/`, `briscoes.edi/`) has its own `pytest.ini` with the same marker definition so tests can be run from within that workspace directory.
 
 ---
 
-## Module 2: `mml_freight_forwarder` — Freight Forwarding & Tender
+## Platform Layer: `mml_base`
 
-**Intent:** Manage international freight forwarding (inbound supply from overseas manufacturers to NZ) with multi-carrier quoting and tender functionality. DSV is primary forwarder; architecture supports adding others.
+All `mml_*` modules depend on `mml_base` + standard Odoo. **No direct cross-module Python imports between app modules.**
 
-**Core flows:**
-- Shipment creation: PO confirmed → freight shipment record → linked to PO lines
-- Tender/quote: Request quotes from multiple forwarders (DSV API + manual) → compare → award
-- Tracking: Milestone updates from forwarder APIs → status visible on PO
-- Landed cost: Freight + duties + insurance → product landed cost for margin accuracy
+`mml_base` provides three integration components:
 
-**Key design decisions:**
-- Carrier abstraction layer — each carrier is a provider class with common interface
-- DSV API is the reference implementation
-- Tender workflow: Draft → Quotes Requested → Quotes Received → Awarded → In Transit → Delivered
-- All freight costs linked to `stock.landed.cost` records
-- Currency handling: quotes in USD/EUR, convert to NZD at booking rate
+| Model | Purpose |
+|-------|---------|
+| `mml.capability` | Registry of what each installed module provides; queried before service calls to avoid hard deps |
+| `mml.registry` | Service locator; returns `NullService` (no-op) if a module is not installed |
+| `mml.event` | Persisted event ledger; doubles as billing meter (`company_id` + `instance_ref` on every event) |
+| `mml.license` | License cache; communicates with `mml.composer` (external SaaS platform) |
 
-**Depends on:** `stock`, `purchase`, `account`
-**Aware of:** `mml_3pl` (inbound shipments arrive at Mainfreight — handoff point), `mml_edi` (EDI POs may trigger upstream purchasing/freight)
+`mml_base` is `application = False` — no menu, no UI, installed as a dependency.
 
 ---
 
-## Module 3: `mml_edi` — Electronic Data Interchange (Retail Partners)
+## Module Descriptions
 
-**Intent:** Automate order, invoice, and despatch advice exchange with retail partners. Reduce manual entry, speed order-to-despatch, eliminate keying errors.
+### `mml_freight` — Freight Forwarding Orchestrator
+PO confirmed → freight tender → multi-carrier quote → booking → tracking → landed cost. Incoterm determines freight responsibility (EXW/FCA/FOB/FAS = MML tenders; CFR/CIF/DAP/DDP = seller handles). Carrier abstraction layer: each carrier is a provider module (`mml_freight_dsv`, `mml_freight_knplus`, etc.).
 
-**Core flows:**
-- Inbound: Partner PO (850/ORDERS) → parsed → Odoo SO created
-- Outbound: Despatch confirmed → ASN (856/DESADV) sent to partner
-- Outbound: Invoice validated → EDI invoice (810/INVOIC) sent to partner
-- Optional: Inventory report (846/INVRPT) for partners requiring stock availability
+DSV uses two APIs: **DSV Generic** (Road/Air/Sea/Rail — OAuth2) and **DSV XPress** (courier — Service Auth + PAT). Webhooks at `/dsv/webhook/<carrier_id>`.
 
-**Key design decisions:**
-- Each partner = a profile with its own mapping, transport, and document config
-- EDI documents stored as `ir.attachment` with full audit trail
-- Pluggable document engine (not hardcoded per partner)
-- Exception queue with manual review UI for failed documents
-- All EDI actions create `mail.message` on related SO/PO/invoice
+### `stock_3pl_core` — 3PL Platform Layer
+Forwarder-agnostic platform: `3pl.connector` (warehouse/transport config), `3pl.message` (async queue, state machine, exponential backoff, dead-letter). Transport implementations: `RestTransport`, `SFTPTransport`, `HttpPostTransport`. `application = False`.
 
-**Depends on:** `sale`, `account`, `stock`
-**Aware of:** `mml_3pl` (ASN depends on Mainfreight despatch confirmation), `mml_freight_forwarder` (freight status affects promise dates)
+### `stock_3pl_mainfreight` — Mainfreight 3PL Implementation
+Extends `stock_3pl_core` with Mainfreight-specific document builders (CSV/XML for SOH, INWH, product specs) and parsers (SO confirmations, inventory reports → `stock.quant` upsert). Custom fields use `x_mf_*` prefix on `stock.warehouse`, `stock.picking`, `sale.order`. Sprint 2 adds haversine-based warehouse routing engine.
+
+### `mml_roq_forecast` — Demand Forecast & ROQ Engine
+Three-layer system: (1) Per-SKU ABCD classification + SMA/EWMA/Holt-Winters demand forecast + safety stock; (2) ROQ `(s,S)` calculation + container fitting + pipeline optimisation; (3) Reactive consolidation + push/pull + 12-month shipment plan. Business logic in pure-Python `services/` classes (no `self.env`) — Odoo models are thin adapters.
+
+### Bridge Modules
+- `mml_roq_freight` — schema bridge between ROQ ↔ Freight (`auto_install`, `application = False`)
+- `mml_freight_3pl` — schema bridge between Freight ↔ 3PL (`auto_install`, `application = False`)
+
+### `briscoes.edi/`
+**Not an Odoo module.** A deployed .NET Framework 4.8 Windows service (`BriscoesEditOrder`) that polls EDIS VAN FTP (`post.edis.co.nz`) every 15 min, parses Briscoes POs, and creates Odoo SOs via XML-RPC. Source is in a separate repo; only compiled binaries are here. Config is entirely in `*.exe.config`.
 
 ---
 
-## Cross-Module Awareness Matrix
+## Cross-Module Integration
 
-Modules don't directly import each other's Python code. Awareness is via:
+Modules communicate via shared Odoo models, chatter (`mail.message`), and computed fields — never direct Python imports. The `mml.event` ledger in `mml_base` is the canonical cross-module signal.
 
-1. **Shared Odoo models** — all modules read/write SO, PO, stock.picking, account.move
-2. **Chatter signals** — modules post `mail.message` updates; others can subscribe
-3. **Computed fields** — e.g., SO shows 3PL status AND EDI status without coupling
-4. **Cron-based orchestration** — scheduled actions check cross-module state
-
-| Trigger Event | Source | Consumer | Action |
-|---|---|---|---|
-| SO confirmed (EDI partner) | `mml_edi` | `mml_3pl` | Queue despatch request to Mainfreight |
-| Mainfreight despatch confirmed | `mml_3pl` | `mml_edi` | Generate & send ASN to retail partner |
-| Mainfreight despatch confirmed | `mml_3pl` | `sale` | Update DO, notify customer |
-| PO confirmed (international) | `purchase` | `mml_freight_forwarder` | Create shipment, request quotes |
-| Freight delivered to Mainfreight | `mml_freight_forwarder` | `mml_3pl` | Trigger inbound receipt |
+| Trigger | Source | Consumer | Action |
+|---------|--------|----------|--------|
+| SO confirmed (EDI partner) | `mml_edi` | `stock_3pl_mainfreight` | Queue despatch to Mainfreight |
+| Mainfreight despatch confirmed | `stock_3pl_mainfreight` | `mml_edi` | Generate & send ASN |
+| PO confirmed (MML freight) | `purchase` | `mml_freight` | Create tender, request quotes |
+| `freight.booking` confirmed | `mml_freight` | `stock_3pl_core` | Create `3pl.message` (inward_order) |
+| Freight delivered | `mml_freight` | `stock_3pl_mainfreight` | Trigger inbound receipt |
 | Invoice validated (EDI partner) | `account` | `mml_edi` | Generate & send EDI invoice |
-| EDI PO received | `mml_edi` | `sale` | Create/update SO |
-| Freight landed cost finalised | `mml_freight_forwarder` | `account` | Update product cost, recalc margins |
+| Freight landed cost finalised | `mml_freight` | `account` | Update product cost |
 
 ---
 
-## EDI Partner Profiles
-
-### Briscoes Group (Briscoes, Rebel Sport, Living & Giving)
-
-| Field | Detail |
-|---|---|
-| Transport | SFTP (Briscoes-hosted or VAN) |
-| Inbound docs | Purchase Order (ORDERS / 850) |
-| Outbound docs | ASN (DESADV / 856), Invoice (INVOIC / 810) |
-| Format | EDIFACT or CSV — confirm with Briscoes IT |
-| Identifiers | GLN for ship-to locations |
-| Requirements | EAN-13 barcode mandatory on ASN lines; SSCC carton labelling likely required; compliance chargebacks for ASN failures |
-| Status | Scope defined, awaiting partner technical spec |
-
-### Harvey Norman NZ
-
-| Field | Detail |
-|---|---|
-| Transport | SFTP or VAN (MessageXchange / SPS Commerce) |
-| Inbound docs | Purchase Order (ORDERS / 850) |
-| Outbound docs | ASN (DESADV / 856), Invoice (INVOIC / 810) |
-| Format | EDIFACT preferred (AU/NZ standard) |
-| Identifiers | GLN for store/DC locations |
-| Requirements | NZ-specific spec (may differ from AU); DC vs store-direct affects ASN structure; cross-dock routing codes |
-| Status | Scope defined, awaiting partner technical spec |
-
-### Animates (Pet retail)
-
-| Field | Detail |
-|---|---|
-| Transport | TBC — may be CSV/email initially, SFTP target |
-| Inbound docs | Purchase Order |
-| Outbound docs | Order Confirmation, ASN, Invoice |
-| Format | CSV initially, migrate to EDIFACT |
-| Requirements | Pet product compliance fields (registration numbers, batch/lot for consumables); may require inventory availability reporting |
-| Status | Scope defined, format TBC |
-
-### PetStock (AU/NZ)
-
-| Field | Detail |
-|---|---|
-| Transport | TBC — likely SPS Commerce or direct SFTP |
-| Inbound docs | Purchase Order |
-| Outbound docs | ASN, Invoice |
-| Format | TBC |
-| Requirements | AU-based — may need AU-format EDIFACT; cross-border shipping considerations; Rufus & Coco brand alignment |
-| Status | Early scope, awaiting engagement |
-
-### Adding New Partners
-
-Architecture must support adding new partners via configuration, not code. Each partner profile contains: transport config, document mappings, GLN/identifiers, validation rules, chargeback/compliance rules.
-
----
-
-## Technical Standards (All Modules)
+## Technical Standards
 
 ### Odoo Conventions
-- Module prefix: `mml_`
-- Model naming: `mml.3pl.despatch`, `mml.freight.shipment`, `mml.edi.document`
+- Module prefix: `mml_` (or `stock_3pl_` for the 3PL platform)
+- Model naming: `mml.freight.booking`, `3pl.message`, `mml.roq.forecast.run`
 - Security: `ir.model.access.csv` + record rules per module
-- Views: form, tree, kanban for pipeline/status views
-- Menus: each module is a **standalone Odoo app** — own root menuitem (no `parent=`), own `web_icon`, `application = True` in manifest. Bridge/platform modules (`mml_base`, `mml_roq_freight`, `mml_freight_3pl`) are exceptions: `application = False`, no menu.
+- Credentials: `ir.config_parameter` only — never hardcoded
+- All external API requests/responses logged as `ir.attachment`
+- Retry: exponential backoff, max 3 attempts, then dead-letter queue
+- App modules: `application = True`, own root menuitem (no `parent=`), `web_icon` pointing to `static/description/icon.png`
+- Platform/bridge modules: `application = False`, no menu
 
-### API Integration Pattern
-- All external API calls via `mml.api.client` base class
-- Retry: exponential backoff, max 3, then dead-letter
-- All requests/responses logged as `ir.attachment`
-- Credentials in `ir.config_parameter`, never hardcoded
-- Prefer async (OCA `queue_job` or cron polling)
+### ERP Agnosticism
+Business logic lives in pure-Python `services/` classes (no `self.env`). Odoo models are thin adapters. This is intentional — future SAP/SAGE adapters call the same service layer.
 
-### Error Handling
-- Failed ops → exception queue (dedicated tree view per module)
-- Email alerts on critical failures
-- Never silently swallow errors
-- Never auto-modify financial/stock data on discrepancies without human confirm
-
-### Testing
-- Unit tests for all API parsing/generation
-- Integration stubs with mock API responses
-- Run with `--test-enable`
-
----
-
-## For Claude: Working on This Project
-
-1. **Read this file first.** Understand where the module sits.
-2. **Respect boundaries.** No hard imports between mml_3pl, mml_freight_forwarder, mml_edi. Use standard Odoo model inheritance and computed fields.
-3. **Production mindset.** Real business. Audit trails, error handling, data integrity are non-negotiable.
-4. **Odoo 19.** OWL for frontend, standard ORM for backend.
-5. **Don't invent specs.** If a partner's EDI format isn't confirmed, scaffold the interface but mark it TBC.
-6. **Check .claude/ for session notes** from previous work sessions before starting.
+### Known Issues / Backlog
+- `freight_booking.py` `action_confirm()` operates on a recordset but calls `_build_inward_order_payload()` which calls `ensure_one()` internally — will raise `ValueError` if called on >1 record. Fix: add `ensure_one()` to `action_confirm()` or loop per record.
