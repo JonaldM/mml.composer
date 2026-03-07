@@ -52,7 +52,7 @@ class Mml3plBridge(models.AbstractModel):
                     )
         except Exception as exc:
             _logger.warning(
-                "mml_roq_freight: _on_freight_booking_confirmed failed for event %s: %s",
+                "mml_freight_3pl: _on_freight_booking_confirmed failed for event %s: %s",
                 event.id if hasattr(event, 'id') else '?',
                 exc,
                 exc_info=True,
