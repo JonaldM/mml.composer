@@ -70,11 +70,21 @@ class MmlEventSubscription(models.Model):
                 model = self.env.get(sub.handler_model)
                 if model is not None:
                     getattr(model, sub.handler_method)(event)
+            except (AttributeError, TypeError) as e:
+                _logger.error(
+                    'Event handler %s.%s failed for event %s (id=%s) — missing method or bad signature: %s',
+                    sub.handler_model,
+                    sub.handler_method,
+                    event.event_type,
+                    event.id,
+                    e,
+                )
             except Exception:
                 _logger.exception(
-                    'Event handler %s.%s failed for event %s (id=%s)',
+                    'Event handler %s.%s raised unexpected exception for event %s (id=%s) — re-raising',
                     sub.handler_model,
                     sub.handler_method,
                     event.event_type,
                     event.id,
                 )
+                raise
