@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root menu — standalone app tile -->
+    <menuitem id="menu_barcode_root"
+              name="Barcodes"
+              web_icon="mml_barcode_registry,static/description/icon.png"
+              sequence="80"/>
+
+    <!-- Dashboard (homepage) -->
+    <menuitem id="menu_barcode_dashboard"
+              name="Registry"
+              parent="menu_barcode_root"
+              action="action_barcode_dashboard"
+              sequence="10"/>
+
+    <!-- Allocation history -->
+    <menuitem id="menu_barcode_allocation"
+              name="Allocation History"
+              parent="menu_barcode_root"
+              action="action_barcode_allocation"
+              sequence="20"/>
+
+    <!-- Analysis sub-menu -->
+    <menuitem id="menu_barcode_analysis"
+              name="Analysis"
+              parent="menu_barcode_root"
+              sequence="30"/>
+
+    <menuitem id="menu_barcode_status_graph"
+              name="Status Breakdown"
+              parent="menu_barcode_analysis"
+              action="action_barcode_registry_graph"
+              sequence="10"/>
+
+    <menuitem id="menu_barcode_brand_graph"
+              name="By Brand"
+              parent="menu_barcode_analysis"
+              action="action_barcode_allocation_graph"
+              sequence="20"/>
+
+    <!-- Configuration (system admin only) -->
+    <menuitem id="menu_barcode_config"
+              name="Configuration"
+              parent="menu_barcode_root"
+              sequence="90"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_barcode_prefix"
+              name="Prefixes"
+              parent="menu_barcode_config"
+              action="action_barcode_prefix"
+              sequence="10"/>
+
+    <menuitem id="menu_barcode_brand"
+              name="Brands"
+              parent="menu_barcode_config"
+              action="action_mml_brand"
+              sequence="20"/>
+</odoo>

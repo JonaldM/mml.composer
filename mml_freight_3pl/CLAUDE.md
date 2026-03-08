@@ -66,3 +66,8 @@ python odoo-bin --test-enable -u mml_freight_3pl -d <db> --stop-after-init
 - **Adding a new trigger event:** Add a handler method on `mml.3pl.bridge` and register a new subscription in `post_init_hook` / deregister in `uninstall_hook`. One subscription per event type.
 - **Adding a new billable unit:** Emit via `mml.event.emit()` with `billable_unit=` matching the unit defined in `mml_base` billing config.
 - **No ORM fields should be added here** — this module owns no database tables. Schema additions belong in `mml_freight` or `stock_3pl_core`.
+
+## Available Commands
+
+- `/plan` — before adding new bridge events or wiring
+- `/tdd` — structural tests first; integration tests require live Odoo

@@ -1,0 +1,14 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mml_brand_user,mml.brand user,model_mml_brand,base.group_user,1,0,0,0
+access_mml_brand_manager,mml.brand manager,model_mml_brand,stock.group_stock_manager,1,1,1,0
+access_mml_brand_admin,mml.brand admin,model_mml_brand,base.group_system,1,1,1,1
+access_barcode_prefix_user,barcode.prefix user,model_mml_barcode_prefix,base.group_user,1,0,0,0
+access_barcode_prefix_admin,barcode.prefix admin,model_mml_barcode_prefix,base.group_system,1,1,1,1
+access_barcode_registry_user,barcode.registry user,model_mml_barcode_registry,base.group_user,1,0,0,0
+access_barcode_registry_manager,barcode.registry manager,model_mml_barcode_registry,stock.group_stock_manager,1,1,1,0
+access_barcode_registry_admin,barcode.registry admin,model_mml_barcode_registry,base.group_system,1,1,1,1
+access_barcode_allocation_user,barcode.allocation user,model_mml_barcode_allocation,base.group_user,1,0,0,0
+access_barcode_allocation_manager,barcode.allocation manager,model_mml_barcode_allocation,stock.group_stock_manager,1,1,1,0
+access_barcode_allocation_admin,barcode.allocation admin,model_mml_barcode_allocation,base.group_system,1,1,1,1
+access_barcode_import_wizard_manager,barcode.import.wizard manager,model_barcode_import_wizard,stock.group_stock_manager,1,1,1,1
+access_barcode_import_wizard_admin,barcode.import.wizard admin,model_barcode_import_wizard,base.group_system,1,1,1,1
