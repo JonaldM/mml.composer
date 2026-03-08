@@ -1,4 +1,4 @@
-# barcodes/mml_barcode_registry/hooks.py
+# mml.barcodes/mml_barcode_registry/hooks.py
 import logging
 
 _logger = logging.getLogger(__name__)

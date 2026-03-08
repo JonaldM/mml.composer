@@ -1,4 +1,4 @@
-# barcodes/mml_barcode_registry/tests/test_allocation.py
+# mml.barcodes/mml_barcode_registry/tests/test_allocation.py
 from datetime import date
 from odoo.tests.common import TransactionCase
 from odoo.exceptions import UserError, ValidationError

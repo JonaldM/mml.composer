@@ -179,7 +179,6 @@ def _install_odoo_stubs():
     odoo_http.route = _stub_route
     odoo_http.request = None
 
-    # ---- odoo (root) ----
     # ---- odoo translation stub ----
     def _(s):
         """No-op translation stub."""

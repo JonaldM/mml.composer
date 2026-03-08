@@ -3,8 +3,9 @@
     'version': '19.0.1.0.0',
     'category': 'Inventory',
     'summary': 'GTIN lifecycle management and one-click allocation',
-    'author': 'MML Consumer Products',
-    'license': 'OPL-1',
+    'author': 'MML Consumer Products Ltd',
+    'website': 'https://www.mmlconsumerproducts.co.nz',
+    'license': 'LGPL-3',
     'depends': [
         'mml_base',
         'stock',

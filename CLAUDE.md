@@ -174,3 +174,11 @@ Modules communicate via shared Odoo models, chatter (`mail.message`), and comput
 
 ### ERP Agnosticism
 Business logic lives in pure-Python `services/` classes (no `self.env`). Odoo models are thin adapters. This is intentional — future SAP/SAGE adapters call the same service layer.
+
+## Available Commands
+
+- `/plan` — implementation plan before adding models, services, or cross-module wiring
+- `/tdd` — TDD workflow; write pure-Python tests first, then Odoo integration tests
+- `/code-review` — quality and security review before module release
+- `/build-fix` — diagnose pytest or `odoo-bin --test-enable` failures
+- `/security-scan` — check for hardcoded credentials, ACL gaps, injection risks

@@ -1,4 +1,4 @@
-# barcodes/mml_barcode_registry/tests/test_import_wizard.py
+# mml.barcodes/mml_barcode_registry/tests/test_import_wizard.py
 import base64
 import csv
 import io

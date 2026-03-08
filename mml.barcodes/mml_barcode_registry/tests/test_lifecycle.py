@@ -1,4 +1,4 @@
-# barcodes/mml_barcode_registry/tests/test_lifecycle.py
+# mml.barcodes/mml_barcode_registry/tests/test_lifecycle.py
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from odoo.tests.common import TransactionCase

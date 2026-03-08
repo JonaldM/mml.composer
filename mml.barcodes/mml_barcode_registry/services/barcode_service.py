@@ -1,4 +1,4 @@
-# barcodes/mml_barcode_registry/services/barcode_service.py
+# mml.barcodes/mml_barcode_registry/services/barcode_service.py
 """
 BarcodeService — registered with mml.registry under key 'barcode'.
 Allows other modules to call barcode operations without a hard import.

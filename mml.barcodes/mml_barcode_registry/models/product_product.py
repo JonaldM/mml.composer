@@ -1,4 +1,4 @@
-# barcodes/mml_barcode_registry/models/product_product.py
+# mml.barcodes/mml_barcode_registry/models/product_product.py
 import logging
 
 from odoo import api, fields, models

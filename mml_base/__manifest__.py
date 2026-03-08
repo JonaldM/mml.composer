@@ -2,9 +2,10 @@
     'name': 'MML Base Platform',
     'version': '19.0.1.0.0',
     'summary': 'Event bus, capability registry, service locator, and billing ledger for MML modules',
-    'author': 'MML Consumer Products',
+    'author': 'MML Consumer Products Ltd',
+    'website': 'https://www.mmlconsumerproducts.co.nz',
     'category': 'Technical',
-    'license': 'OPL-1',
+    'license': 'LGPL-3',
     'depends': ['mail', 'base'],
     'data': [
         'security/ir.model.access.csv',
