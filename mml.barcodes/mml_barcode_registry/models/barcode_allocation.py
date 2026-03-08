@@ -1,7 +1,7 @@
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 _ALLOCATION_STATUS = [
@@ -61,7 +61,7 @@ class BarcodeAllocation(models.Model):
     discontinue_date = fields.Date()
     reuse_eligible_date = fields.Date(
         string='Reuse Eligible Date',
-        help='Earliest date GTIN can be reallocated (discontinue_date + 48 months)',
+        help='Earliest date GTIN can be reallocated (allocation_date + 48 months, per GS1 best practice)',
     )
     notes = fields.Text()
     company_id = fields.Many2one(
@@ -78,6 +78,24 @@ class BarcodeAllocation(models.Model):
                 f"{rec.product_id.display_name or '?'} [{rec.status}]"
             )
 
+    @api.constrains('product_id', 'company_id', 'status')
+    def _check_unique_active_allocation(self):
+        for rec in self:
+            if rec.status != 'active':
+                continue
+            duplicate = self.search([
+                ('product_id', '=', rec.product_id.id),
+                ('company_id', '=', rec.company_id.id),
+                ('status', '=', 'active'),
+                ('id', '!=', rec.id),
+            ], limit=1)
+            if duplicate:
+                raise ValidationError(
+                    f"Product '{rec.product_id.display_name}' already has an active "
+                    f"barcode allocation (GTIN: {duplicate.registry_id.gtin_13}). "
+                    f"Deactivate the existing allocation before creating a new one."
+                )
+
     def _validate_transition(self, new_status):
         self.ensure_one()
         allowed = _VALID_ALLOCATION_TRANSITIONS.get(self.status, [])
@@ -92,10 +110,11 @@ class BarcodeAllocation(models.Model):
         for rec in self:
             rec._validate_transition('dormant')
             today = date.today()
+            reuse_start = rec.allocation_date or today
             rec.write({
                 'status': 'dormant',
                 'discontinue_date': today,
-                'reuse_eligible_date': today + relativedelta(months=48),
+                'reuse_eligible_date': reuse_start + relativedelta(months=48),
             })
 
     def action_reactivate(self):

@@ -89,6 +89,18 @@ class ProductProduct(models.Model):
                 "Remove it first or use 'Register' to track an existing barcode."
             )
 
+        existing_active = self.env['mml.barcode.allocation'].search([
+            ('product_id', '=', self.id),
+            ('company_id', '=', self.env.company.id),
+            ('status', '=', 'active'),
+        ], limit=1)
+        if existing_active:
+            raise UserError(
+                f"Product already has an active GTIN allocation: "
+                f"{existing_active.registry_id.gtin_13}. "
+                f"Retire or deactivate the existing allocation first."
+            )
+
         # 1. Find best available prefix (priority ASC, then by availability)
         prefix = self._find_allocation_prefix()
         if not prefix:
