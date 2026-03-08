@@ -156,9 +156,14 @@ class BarcodeRegistry(models.Model):
                 delta = relativedelta(rec.reuse_eligible_date, today)
                 months_remaining = delta.years * 12 + delta.months + (1 if delta.days > 0 else 0)
                 raise UserError(
-                    f"GTIN {rec.gtin_13} cannot be returned to pool yet. "
-                    f"Reuse eligible in approximately {months_remaining} month(s) "
-                    f"(eligible date: {rec.reuse_eligible_date})."
+                    f"GTIN {rec.gtin_13} cannot be returned to pool yet.\n\n"
+                    f"GS1 requires a 48-month cool-down before a GTIN may be reassigned "
+                    f"to a different product. This prevents barcode conflicts in retailer "
+                    f"systems and point-of-sale scanners that cache product data.\n\n"
+                    f"Eligible to return to pool: {rec.reuse_eligible_date} "
+                    f"({months_remaining} month(s) remaining).\n\n"
+                    f"To obtain new GTINs now, apply for an additional prefix block at "
+                    f"https://www.gs1nz.org/"
                 )
             rec.status = 'unallocated'
             rec.current_allocation_id = False
