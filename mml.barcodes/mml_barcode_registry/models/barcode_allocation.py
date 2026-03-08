@@ -27,6 +27,7 @@ def _months_until(target_date, today):
 class BarcodeAllocation(models.Model):
     _name = 'mml.barcode.allocation'
     _description = 'Barcode Allocation History'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'allocation_date desc'
     _rec_name = 'gtin_13'
 
@@ -50,6 +51,7 @@ class BarcodeAllocation(models.Model):
     brand_id = fields.Many2one(
         'mml.brand',
         ondelete='set null',
+        tracking=True,
     )
     status = fields.Selection(
         _ALLOCATION_STATUS,
