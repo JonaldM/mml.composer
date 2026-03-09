@@ -48,3 +48,6 @@ htmlcov/
 # Working documents (not source)
 barcodes/*.docx
 docs/preview/
+
+# Sensitive files
+ssh.txt
