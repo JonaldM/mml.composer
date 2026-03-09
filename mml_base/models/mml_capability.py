@@ -9,7 +9,7 @@ class MmlCapability(models.Model):
     module = fields.Char(required=True, index=True)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
 
-    unique_name_module = models.Constraint(
+    _unique_name_module = models.Constraint(
         'UNIQUE(name, module)',
         'Capability already registered for this module',
     )
