@@ -533,14 +533,155 @@ client.close()
 
 ---
 
+## Task 8: Install stock_3pl_core + stock_3pl_mainfreight
+
+**Goal:** Install both 3PL modules into `MML_EDI_Compat` (mml_base already installed). Dependency order: `stock_3pl_core` first, then `stock_3pl_mainfreight`.
+
+**Repo:** `https://github.com/JonaldM/mml.3pl.odoo.git` (make public before running — same as mml.composer)
+
+**Known pre-fixes applied locally (already committed and pushed):**
+- Removed `numbercall` from 4 cron records (stock_3pl_core/data/cron.xml ×2, tracking_cron.xml, inbound_cron.xml)
+- Removed `password=True` from 6 field definitions (connector.py ×2, connector_mf.py ×4)
+- Fixed `%(xmlid)d` button name syntax in connector_views.xml and exception_views.xml
+
+**Extra Python dependency:** `cryptography` must be present in the Odoo venv for Fernet credential encryption. Check and install if missing (see Step 1).
+
+---
+
+### Step 1: Check and install `cryptography` in Odoo venv
+```python
+client = connect()
+rc, out, _ = run(client, "/opt/odoo19/venv/bin/pip show cryptography 2>&1")
+print("cryptography:", out[:200] if rc == 0 else "NOT INSTALLED")
+if rc != 0:
+    rc2, out2, err2 = run(client,
+        "echo 'Lockitdown456' | sudo -S /opt/odoo19/venv/bin/pip install cryptography 2>&1",
+        timeout=120
+    )
+    print("install rc:", rc2, out2[-300:])
+client.close()
+```
+
+### Step 2: Clone the 3PL repo on the server
+```python
+client = connect()
+rc, out, _ = run(client, "test -d /tmp/mml_3pl_repo/.git && echo EXISTS || echo MISSING")
+if 'EXISTS' in out:
+    rc, out, err = run(client, "cd /tmp/mml_3pl_repo && git pull origin master 2>&1", timeout=120)
+else:
+    rc, out, err = run(client,
+        "git clone --depth 1 https://github.com/JonaldM/mml.3pl.odoo.git /tmp/mml_3pl_repo 2>&1",
+        timeout=180)
+print(f"rc={rc}", out[-300:])
+client.close()
+```
+
+### Step 3: Symlink 3PL addons into /tmp/mml_compat/
+```python
+client = connect()
+# stock_3pl_core
+run(client, "ln -sfn /tmp/mml_3pl_repo/addons/stock_3pl_core /tmp/mml_compat/stock_3pl_core")
+# stock_3pl_mainfreight
+run(client, "ln -sfn /tmp/mml_3pl_repo/addons/stock_3pl_mainfreight /tmp/mml_compat/stock_3pl_mainfreight")
+rc, out, _ = run(client, "ls -la /tmp/mml_compat/")
+print(out)
+client.close()
+```
+
+### Step 4: Stop odoo19, install stock_3pl_core
+```python
+client = connect()
+run(client, "echo 'Lockitdown456' | sudo -S systemctl stop odoo19.service 2>&1")
+
+cmd = (
+    "echo 'Lockitdown456' | sudo -S -u odoo "
+    "/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
+    "-c /tmp/odoo19_edi_compat.conf "
+    "-i stock_3pl_core "
+    "-d MML_EDI_Compat "
+    "--stop-after-init 2>&1"
+)
+rc, out, err = run(client, cmd, timeout=400)
+print(f"stock_3pl_core install rc={rc}")
+print((out + err)[-6000:])
+client.close()
+```
+Expected: `Modules loaded.` with no ERRORs from stock_3pl_core.
+
+### Step 5: Install stock_3pl_mainfreight
+```python
+client = connect()
+cmd = (
+    "echo 'Lockitdown456' | sudo -S -u odoo "
+    "/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
+    "-c /tmp/odoo19_edi_compat.conf "
+    "-i stock_3pl_mainfreight "
+    "-d MML_EDI_Compat "
+    "--stop-after-init 2>&1"
+)
+rc, out, err = run(client, cmd, timeout=400)
+print(f"stock_3pl_mainfreight install rc={rc}")
+print((out + err)[-6000:])
+client.close()
+```
+
+### Step 6: Restart odoo19 and verify
+```python
+client = connect()
+run(client, "echo 'Lockitdown456' | sudo -S systemctl start odoo19.service 2>&1")
+time.sleep(5)
+rc, out, _ = run(client, "echo 'Lockitdown456' | sudo -S systemctl is-active odoo19.service 2>&1")
+print("service:", out)
+
+rc, out, _ = run(client,
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat "
+    "-c \"SELECT name, state FROM ir_module_module "
+    "WHERE name IN ('mml_base','mml_edi','stock_3pl_core','stock_3pl_mainfreight') ORDER BY name;\" 2>&1"
+)
+print(out)
+client.close()
+```
+Expected: all 4 modules in state `installed`.
+
+### Step 7: Spot-check key DB objects
+```python
+client = connect()
+checks = [
+    # Connector model exists
+    "SELECT count(*) FROM ir_model WHERE model='3pl.connector';",
+    # Message queue model exists
+    "SELECT count(*) FROM ir_model WHERE model='3pl.message';",
+    # MF crons registered (inactive by default)
+    "SELECT cron_name, active FROM ir_cron WHERE cron_name LIKE '%MF%' OR cron_name LIKE '%3PL%';",
+    # KPI dashboard model
+    "SELECT count(*) FROM ir_model WHERE model='mf.kpi.dashboard';",
+]
+for q in checks:
+    rc, out, _ = run(client,
+        f"echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"{q}\" 2>&1"
+    )
+    print(q[:60], "->", out.strip())
+client.close()
+```
+
+### Report
+- PASS / FAIL per module
+- Any errors or tracebacks (first occurrence with surrounding context)
+- Remaining warnings
+- DB spot-check results
+
+---
+
 ## Success criteria
 
 - [ ] `mml_base` installs with state=`installed` and no ERRORs
 - [ ] `mml_edi` installs with state=`installed` and no ERRORs
+- [ ] `stock_3pl_core` installs with state=`installed` and no ERRORs
+- [ ] `stock_3pl_mainfreight` installs with state=`installed` and no ERRORs
 - [ ] All XML data files load (sequences, trading partner, cron, menus)
 - [ ] Odoo integration tests pass (or failures are documented and understood)
-- [ ] `MML_EDI_Compat` dropped — confirmed not in pg db list
-- [ ] `/tmp/mml_compat/` removed — confirmed gone
+- [ ] `MML_EDI_Compat` kept for ongoing module testing
+- [ ] `/tmp/mml_compat/` and `/tmp/mml_3pl_repo/` cleaned up only after all modules tested
 - [ ] Odoo 19 service restarted and active
 - [ ] `MML_Test_Odoo19_02102026` untouched throughout
 

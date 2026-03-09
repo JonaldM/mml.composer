@@ -13,6 +13,6 @@ class MmlBrand(models.Model):
         default=lambda self: self.env.company,
     )
 
-    _sql_constraints = [
-        ('name_company_uniq', 'UNIQUE(name, company_id)', 'Brand name must be unique per company.'),
-    ]
+    _name_company_uniq = models.Constraint(
+        'UNIQUE(name, company_id)', 'Brand name must be unique per company.',
+    )

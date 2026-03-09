@@ -53,9 +53,9 @@ class BarcodePrefix(models.Model):
         help='Next sequence number with no registry record',
     )
 
-    _sql_constraints = [
-        ('prefix_company_uniq', 'UNIQUE(prefix, company_id)', 'Prefix must be unique per company.'),
-    ]
+    _prefix_company_uniq = models.Constraint(
+        'UNIQUE(prefix, company_id)', 'Prefix must be unique per company.',
+    )
 
     @api.constrains('prefix')
     def _check_prefix_format(self):
