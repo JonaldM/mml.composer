@@ -14,7 +14,6 @@ class MmlLicense(models.Model):
     org_ref = fields.Char(help='Organisation identifier from the MML platform')
     license_key = fields.Char(
         help='Secret license key — do not share',
-        password=True,
         groups='base.group_system',
     )
     tier = fields.Selection([

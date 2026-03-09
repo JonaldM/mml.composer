@@ -9,9 +9,10 @@ class MmlCapability(models.Model):
     module = fields.Char(required=True, index=True)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
 
-    _sql_constraints = [
-        ('unique_name_module', 'UNIQUE(name, module)', 'Capability already registered for this module'),
-    ]
+    unique_name_module = models.Constraint(
+        'UNIQUE(name, module)',
+        'Capability already registered for this module',
+    )
 
     @api.model
     def register(self, capabilities: list[str], module: str) -> None:
