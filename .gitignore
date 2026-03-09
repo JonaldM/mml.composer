@@ -51,3 +51,8 @@ docs/preview/
 
 # Sensitive files
 ssh.txt
+
+# Throwaway agent scripts (server-side patching helpers)
+patch_*.py
+restart_and_verify.py
+scripts/
