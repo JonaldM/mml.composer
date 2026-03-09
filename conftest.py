@@ -157,12 +157,17 @@ def _install_odoo_stubs():
             return cls
         return decorator
 
+    class HttpCase(TransactionCase):
+        """Stub: HTTP test case requiring Odoo."""
+
     odoo_tests.TransactionCase = TransactionCase
+    odoo_tests.HttpCase = HttpCase
     odoo_tests.tagged = tagged
 
     # ---- odoo.tests.common (alias) ----
     odoo_tests_common = types.ModuleType('odoo.tests.common')
     odoo_tests_common.TransactionCase = TransactionCase
+    odoo_tests_common.HttpCase = HttpCase
 
     # ---- odoo.http ----
     odoo_http = types.ModuleType('odoo.http')

@@ -13,7 +13,7 @@ class MmlEventSubscription(models.Model):
     _description = 'MML Event Subscription'
     _rec_name = 'event_type'
 
-    unique_subscription = models.Constraint(
+    _unique_subscription = models.Constraint(
         'UNIQUE(event_type, handler_model, handler_method, module)',
         'A subscription for this event_type/handler_model/handler_method/module combination already exists.',
     )
