@@ -82,7 +82,7 @@
                         domain="[('status', '=', 'discontinued')]"/>
                 <filter string="Reuse Eligible" name="reuse_eligible"
                         domain="[('status', '=', 'dormant'), ('reuse_eligible_date', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter string="Brand" name="group_brand" context="{'group_by': 'brand_id'}"/>
                     <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
                     <filter string="Allocation Year" name="group_year" context="{'group_by': 'allocation_date:year'}"/>

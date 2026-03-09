@@ -103,7 +103,7 @@
                         domain="[('status', '=', 'retired')]"/>
                 <filter string="Reuse Eligible" name="reuse_eligible"
                         domain="[('status', '=', 'retired'), ('reuse_eligible_date', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
-                <group expand="1" string="Group By">
+                <group>
                     <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
                     <filter string="Prefix" name="group_prefix" context="{'group_by': 'prefix_id'}"/>
                 </group>

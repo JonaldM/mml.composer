@@ -72,7 +72,7 @@ class BarcodeRegistry(models.Model):
     )
     reuse_eligible_date = fields.Date(
         compute='_compute_reuse_eligible_date',
-        store=False,
+        store=True,
         string='Reuse Eligible Date',
     )
     company_id = fields.Many2one(
