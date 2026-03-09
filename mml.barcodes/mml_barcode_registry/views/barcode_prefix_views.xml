@@ -35,12 +35,12 @@
                     <div class="oe_button_box" name="button_box">
                         <button name="%(action_barcode_registry)d" type="action"
                                 class="oe_stat_button" icon="fa-barcode"
-                                context="{'search_default_in_use': 1, 'default_prefix_id': active_id}">
+                                context="{'search_default_in_use': 1, 'default_prefix_id': id}">
                             <field name="allocated_count" widget="statinfo" string="In Use"/>
                         </button>
                         <button name="%(action_barcode_registry)d" type="action"
                                 class="oe_stat_button" icon="fa-database"
-                                context="{'search_default_unallocated': 1, 'default_prefix_id': active_id}">
+                                context="{'search_default_unallocated': 1, 'default_prefix_id': id}">
                             <div class="o_field_widget o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="capacity"/>

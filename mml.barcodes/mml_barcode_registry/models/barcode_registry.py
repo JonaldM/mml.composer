@@ -81,11 +81,11 @@ class BarcodeRegistry(models.Model):
         default=lambda self: self.env.company,
     )
 
-    _sql_constraints = [
-        ('gtin13_uniq', 'UNIQUE(gtin_13)', 'GTIN-13 must be unique.'),
-        ('gtin14_uniq', 'UNIQUE(gtin_14)', 'GTIN-14 must be unique.'),
-        ('sequence_company_uniq', 'UNIQUE(sequence, company_id)', 'Sequence must be unique per company.'),
-    ]
+    _gtin13_uniq = models.Constraint('UNIQUE(gtin_13)', 'GTIN-13 must be unique.')
+    _gtin14_uniq = models.Constraint('UNIQUE(gtin_14)', 'GTIN-14 must be unique.')
+    _sequence_company_uniq = models.Constraint(
+        'UNIQUE(sequence, company_id)', 'Sequence must be unique per company.',
+    )
 
     @api.depends('sequence')
     def _compute_gtin(self):
