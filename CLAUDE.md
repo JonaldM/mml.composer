@@ -36,8 +36,7 @@ mml.odoo.apps/
 │       └── stock_3pl_mainfreight/       ← Mainfreight implementation
 ├── mml.roq.model/
 │   └── mml_roq_forecast/               ← Demand forecasting, ROQ calculation, 12-month shipment plan
-├── mml.edi/                             ← EDI engine (Odoo module) + legacy .NET binaries
-│   └── mml_edi/                         ← mml_edi Odoo module (module root is mml.edi/ itself)
+├── mml_edi/                             ← EDI engine: mml_edi Odoo module + legacy .NET binaries
 ├── mml.barcodes/
 │   └── mml_barcode_registry/            ← Barcode registry module
 └── mml.forecasting/
