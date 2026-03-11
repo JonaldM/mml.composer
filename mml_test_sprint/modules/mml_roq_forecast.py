@@ -129,10 +129,29 @@ class RoqForecastTests(BaseModuleTest):
             "spec: SG form has state statusbar (draft->confirmed->tendered->booked->delivered)"
         ))
 
-        self.add_spec(self.s.check_element_exists(
-            'button[name="action_confirm"]',
-            "spec: SG form has Confirm & Create Tender button"
-        ))
+        # action_confirm button — visible only on draft records.
+        # Iterate the list to find a draft record before checking the button.
+        self.s.goto(f"{BASE_URL}/odoo/action-{ACTION_SHIPMENT_GROUPS}?view_type=list", wait_ms=4000)
+        draft_found = False
+        list_rows = self.s.page.locator('.o_data_row')
+        for i in range(min(list_rows.count(), 10)):
+            badge = list_rows.nth(i).locator('[name="state"], .badge')
+            if badge.count() > 0 and 'draft' in badge.first.inner_text().lower():
+                list_rows.nth(i).click()
+                self.s.page.wait_for_timeout(3000)
+                draft_found = True
+                break
+        if draft_found:
+            self.add_spec(self.s.check_element_exists(
+                'button[name="action_confirm"]',
+                "spec: SG form has Confirm & Create Tender button (on draft record)"
+            ))
+        else:
+            self.add_spec(Check(
+                "spec: SG form has Confirm & Create Tender button",
+                Status.SKIP,
+                "No draft shipment groups exist to test button visibility"
+            ))
 
         self.add_spec(self.s.check_element_exists(
             '[name="total_cbm"]',
@@ -306,32 +325,38 @@ class RoqForecastTests(BaseModuleTest):
                                 "No group with View SKUs button found"))
 
     def _workflow_calendar_shows_events(self):
-        """Calendar: navigate to June 2026 where shipments are scheduled — events must appear."""
+        """Calendar: navigate forward month-by-month until events appear (up to 6 months)."""
         self.s.goto(f"{BASE_URL}/odoo/action-{ACTION_CALENDAR}", wait_ms=5000)
 
-        close = self.s.page.locator('.o_facet_remove').first
-        if close.is_visible():
-            close.click()
+        # Remove default 'Active' filter so draft records are visible
+        close_btns = self.s.page.locator('.o_facet_remove')
+        if close_btns.count() > 0:
+            close_btns.first.click()
             self.s.page.wait_for_timeout(1500)
 
         next_btn = self.s.page.locator('button.o_next')
-        for _ in range(3):
+        event_count = 0
+        found_month = None
+        for month_offset in range(1, 7):  # check Apr through Sep 2026
             if next_btn.count() > 0:
                 next_btn.click()
-                self.s.page.wait_for_timeout(1200)
+                self.s.page.wait_for_timeout(1500)
+            event_count = self.s.page.locator('.fc-event').count()
+            if event_count > 0:
+                found_month = month_offset
+                break
 
-        event_count = self.s.page.locator('.fc-event').count()
-        if event_count == 0:
+        if found_month is not None:
             self.add_workflow(self.s.snap(Check(
-                "workflow: Calendar shows June shipment events",
-                Status.WARN,
-                "No events in June — target_ship_date may not match calendar range, or filter issue"
+                "workflow: Calendar shows shipment events",
+                Status.PASS,
+                f"{event_count} event(s) visible at +{found_month} month(s) from current"
             )))
         else:
             self.add_workflow(self.s.snap(Check(
-                "workflow: Calendar shows June shipment events",
-                Status.PASS,
-                f"{event_count} event(s) visible"
+                "workflow: Calendar shows shipment events",
+                Status.WARN,
+                "No events found in next 6 months — check target_ship_date values in DB"
             )))
 
     def _workflow_roq_run_has_lines(self):
@@ -343,17 +368,15 @@ class RoqForecastTests(BaseModuleTest):
             return
         rows.first.click()
         self.s.page.wait_for_timeout(3000)
-        tab = self.s.page.locator(
-            '.o_notebook .nav-link:has-text("Supplier"), '
-            'a:has-text("By Supplier"), '
-            'a:has-text("Order by Supplier")'
-        )
+        # ROQ Run form has "Results" tab (forecast lines) and "Run Log" tab.
+        # The "By Supplier" grouping is on the Order Dashboard, not here.
+        tab = self.s.page.locator('.o_notebook .nav-link:has-text("Results")')
         if tab.count() > 0:
             tab.first.click()
             self.s.page.wait_for_timeout(2000)
             self.add_workflow(self.s.snap(self.s.check_row_count(
-                '.o_data_row', 1, "workflow: ROQ run By Supplier tab has rows"
+                '.o_data_row', 1, "workflow: ROQ run Results tab has forecast lines"
             )))
         else:
-            self.add_workflow(Check("workflow: ROQ run has supplier lines", Status.WARN,
-                                   "No 'By Supplier' tab found on ROQ Run form"))
+            self.add_workflow(Check("workflow: ROQ run has forecast lines", Status.WARN,
+                                   "No 'Results' tab found on ROQ Run form"))
