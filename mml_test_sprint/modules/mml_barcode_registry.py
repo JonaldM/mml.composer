@@ -9,33 +9,28 @@ class BarcodeRegistryTests(BaseModuleTest):
     module_label = "Barcode Registry"
 
     def run_smoke(self):
-        """Navigate to barcode registry views."""
-        # Try common URL patterns for the app
-        self.s.goto(f"{BASE_URL}/odoo/barcodes", wait_ms=4000)
-        # If that 404s, try the app menu
-        if "404" in self.s.page.url or self.s.page.locator('.o_action').count() == 0:
-            # Try via app tile
-            self.s.goto(f"{BASE_URL}/odoo", wait_ms=3000)
-            app_tile = self.s.page.locator('.o_app:has-text("Barcode"), .o_app:has-text("barcode")')
-            if app_tile.count() > 0:
-                app_tile.first.click()
-                self.s.page.wait_for_timeout(3000)
-            else:
-                self.add_smoke(Check("smoke: Barcode app accessible", Status.WARN,
-                                    "Could not find Barcode app tile — may not be installed"))
-                return
+        """Navigate to barcode registry views using the correct action URLs."""
+        ACTION_ALLOCATION = "action-mml_barcode_registry.action_barcode_allocation"
+        ACTION_DASHBOARD = "action-mml_barcode_registry.action_barcode_dashboard"
 
-        self.add_smoke(self.s.snap(self.s.check_no_js_errors("smoke: Barcode Registry loads")))
+        # Try allocation list first
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=4000)
 
-        # Try to find a list view
-        list_btn = self.s.page.locator('button[name="list"], .o_switch_view[data-type="list"]')
-        if list_btn.count() > 0:
-            list_btn.first.click()
-            self.s.page.wait_for_timeout(2000)
+        # Check we're on an Odoo view (not a 404 or login redirect)
+        if self.s.page.locator('.o_action, .o_list_view, .o_view_controller').count() == 0:
+            self.add_smoke(Check("smoke: Barcode allocation list loads", Status.FAIL,
+                                 f"Navigation to {ACTION_ALLOCATION} did not render an Odoo view"))
+            return
 
-        self.add_smoke(self.s.snap(self.s.check_no_js_errors("smoke: Barcode list loads")))
+        self.add_smoke(self.s.snap(self.s.check_no_js_errors("smoke: Barcode allocation list loads")))
+        self.add_smoke(self.s.check_no_error_dialog("smoke: Barcode allocation no error dialog"))
+
+        # Dashboard view
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_DASHBOARD}", wait_ms=4000)
+        self.add_smoke(self.s.snap(self.s.check_no_js_errors("smoke: Barcode dashboard loads")))
 
         # Open a record if any exist
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=3000)
         rows = self.s.page.locator('.o_data_row')
         if rows.count() > 0:
             rows.first.click()
@@ -43,20 +38,23 @@ class BarcodeRegistryTests(BaseModuleTest):
             self.s.scroll_to_top()
             self.add_smoke(self.s.snap(self.s.check_no_blank_page("smoke: Barcode form not blank")))
         else:
-            self.add_smoke(Check("smoke: Barcode record opens", Status.SKIP, "No records in DB"))
+            self.add_smoke(Check("smoke: Barcode record opens", Status.SKIP,
+                                 "No barcode records in DB"))
 
     def run_spec(self):
-        """Verify key fields described in CLAUDE.md are present."""
-        # CLAUDE.md: GTIN lifecycle, allocation state, GS1 company prefix
+        """Verify key fields: GTIN, allocation state, product link."""
+        ACTION_ALLOCATION = "action-mml_barcode_registry.action_barcode_allocation"
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=4000)
+
         rows = self.s.page.locator('.o_data_row')
         if rows.count() == 0:
-            # Try to open new record form
             new_btn = self.s.page.locator('button.o_list_button_add, button:has-text("New")')
             if new_btn.count() > 0:
                 new_btn.first.click()
                 self.s.page.wait_for_timeout(2000)
             else:
-                self.add_spec(Check("spec: Barcode fields", Status.SKIP, "No records and no New button"))
+                self.add_spec(Check("spec: Barcode fields", Status.SKIP,
+                                    "No records in DB and no New button accessible"))
                 return
         else:
             rows.first.click()
@@ -65,24 +63,24 @@ class BarcodeRegistryTests(BaseModuleTest):
 
         self.add_spec(self.s.snap(self.s.check_no_blank_page("spec: Barcode form renders")))
 
-        # From CLAUDE.md: GTIN field
         self.add_spec(self.s.check_element_exists(
-            '[name="name"], [name="gtin"], input[id*="gtin"]',
-            "spec: Barcode has GTIN/name field"
+            '[name="name"], [name="gtin"], [name="barcode"]',
+            "spec: Barcode has name/GTIN field"
         ))
 
-        # Allocation state
         self.add_spec(self.s.check_element_exists(
             '[name="state"], [name="allocation_state"], .o_statusbar_status',
-            "spec: Barcode has allocation state"
+            "spec: Barcode has allocation state field or statusbar"
         ))
 
     def run_workflows(self):
-        """Barcode registry: verify list loads, count records."""
+        """Barcode registry: verify list loads and count records."""
+        ACTION_ALLOCATION = "action-mml_barcode_registry.action_barcode_allocation"
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=4000)
         rows = self.s.page.locator('.o_data_row')
         count = rows.count()
-        self.add_workflow(Check(
-            "workflow: Barcode list has records",
+        self.add_workflow(self.s.snap(Check(
+            "workflow: Barcode allocation list has records",
             Status.PASS if count > 0 else Status.WARN,
             f"{count} barcode record(s) in DB"
-        ))
+        )))
