@@ -33,11 +33,19 @@ class BrowserSession:
         self.page.on("console", self._on_console)
         self.page.on("pageerror", lambda e: self._console_errors.append(f"[PAGE ERROR] {e}"))
 
+    # Harmless Odoo/browser messages that should not fail smoke checks
+    _NOISE_PATTERNS = (
+        "favicon",
+        "ERR_UNKNOWN_URL_SCHEME",
+        "SharedWorker",          # Normal fallback in headless Chromium
+        "fallback on Worker",    # Same SharedWorker fallback message
+        "NET::ERR_BLOCKED",      # Chrome blocking third-party cookies in headless
+    )
+
     def _on_console(self, msg):
         if msg.type in ("error", "warning"):
             text = msg.text
-            # Filter known non-issues
-            if "favicon" in text or "ERR_UNKNOWN_URL_SCHEME" in text:
+            if any(p in text for p in self._NOISE_PATTERNS):
                 return
             self._console_errors.append(f"[{msg.type.upper()}] {text}")
 

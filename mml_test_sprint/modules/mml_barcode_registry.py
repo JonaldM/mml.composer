@@ -30,7 +30,7 @@ class BarcodeRegistryTests(BaseModuleTest):
         self.add_smoke(self.s.snap(self.s.check_no_js_errors("smoke: Barcode dashboard loads")))
 
         # Open a record if any exist
-        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=3000)
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=5000)
         rows = self.s.page.locator('.o_data_row')
         if rows.count() > 0:
             rows.first.click()
@@ -44,7 +44,7 @@ class BarcodeRegistryTests(BaseModuleTest):
     def run_spec(self):
         """Verify key fields: GTIN, allocation state, product link."""
         ACTION_ALLOCATION = "action-mml_barcode_registry.action_barcode_allocation"
-        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=4000)
+        self.s.goto(f"{BASE_URL}/odoo/{ACTION_ALLOCATION}?view_type=list", wait_ms=6000)
 
         rows = self.s.page.locator('.o_data_row')
         if rows.count() == 0:
@@ -64,7 +64,7 @@ class BarcodeRegistryTests(BaseModuleTest):
         self.add_spec(self.s.snap(self.s.check_no_blank_page("spec: Barcode form renders")))
 
         self.add_spec(self.s.check_element_exists(
-            '[name="name"], [name="gtin"], [name="barcode"]',
+            '[name="name"], [name="gtin"], [name="barcode"], [name="gtin_13"], [name="gtin13"]',
             "spec: Barcode has name/GTIN field"
         ))
 

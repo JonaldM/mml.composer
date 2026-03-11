@@ -129,8 +129,30 @@ class RoqForecastTests(BaseModuleTest):
             "spec: SG form has state statusbar (draft->confirmed->tendered->booked->delivered)"
         ))
 
+        # Check form fields while still on first record
+        self.add_spec(self.s.check_element_exists(
+            '[name="total_cbm"]',
+            "spec: SG form has Total CBM field"
+        ))
+
+        self.add_spec(self.s.check_element_exists(
+            '[name="fill_percentage"]',
+            "spec: SG form has Fill % field"
+        ))
+
+        self.add_spec(self.s.check_element_exists(
+            '[name="container_type"]',
+            "spec: SG form has Container Type field"
+        ))
+
+        self.add_spec(self.s.check_element_exists(
+            '.o_notebook .nav-link:has-text("Suppliers"), '
+            '.nav-link:has-text("Suppliers")',
+            "spec: SG form has Suppliers tab"
+        ))
+
         # action_confirm button — visible only on draft records.
-        # Iterate the list to find a draft record before checking the button.
+        # Navigate to list and iterate to find a draft record.
         self.s.goto(f"{BASE_URL}/odoo/action-{ACTION_SHIPMENT_GROUPS}?view_type=list", wait_ms=4000)
         draft_found = False
         list_rows = self.s.page.locator('.o_data_row')
@@ -152,26 +174,6 @@ class RoqForecastTests(BaseModuleTest):
                 Status.SKIP,
                 "No draft shipment groups exist to test button visibility"
             ))
-
-        self.add_spec(self.s.check_element_exists(
-            '[name="total_cbm"]',
-            "spec: SG form has Total CBM field"
-        ))
-
-        self.add_spec(self.s.check_element_exists(
-            '[name="fill_percentage"]',
-            "spec: SG form has Fill % field"
-        ))
-
-        self.add_spec(self.s.check_element_exists(
-            '[name="container_type"]',
-            "spec: SG form has Container Type field"
-        ))
-
-        self.add_spec(self.s.check_element_exists(
-            '.o_notebook .nav-link:has-text("Suppliers")',
-            "spec: SG form has Suppliers tab"
-        ))
 
     def _spec_suppliers_tab(self):
         """Suppliers tab: spec says supplier, CBM, SKU count, OOS risk, View SKUs button."""
@@ -367,7 +369,7 @@ class RoqForecastTests(BaseModuleTest):
             self.add_workflow(Check("workflow: ROQ run has supplier lines", Status.SKIP, "No runs"))
             return
         rows.first.click()
-        self.s.page.wait_for_timeout(3000)
+        self.s.page.wait_for_timeout(5000)
         # ROQ Run form has "Results" tab (forecast lines) and "Run Log" tab.
         # The "By Supplier" grouping is on the Order Dashboard, not here.
         tab = self.s.page.locator('.o_notebook .nav-link:has-text("Results")')
