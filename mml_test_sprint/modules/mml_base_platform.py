@@ -25,23 +25,47 @@ def run_mml_base_checks() -> ModuleResult:
     )
 
     checks = [
-        # Model existence
+        # Platform model existence
         ("mml.capability model exists",
          "SELECT COUNT(*) FROM ir_model WHERE model = 'mml.capability'", 1),
         ("mml.registry model exists",
          "SELECT COUNT(*) FROM ir_model WHERE model = 'mml.registry'", 1),
         ("mml.event model exists",
          "SELECT COUNT(*) FROM ir_model WHERE model = 'mml.event'", 1),
-        # ROQ config params
-        ("ROQ lead time config param exists",
+        # All 14 ROQ config params
+        ("ROQ lead time param",
          "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.default_lead_time_days'", 1),
-        ("ROQ service level config param exists",
+        ("ROQ service level param",
          "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.default_service_level'", 1),
-        ("ROQ lookback weeks config param exists",
+        ("ROQ lookback weeks param",
          "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.lookback_weeks'", 1),
-        # Sequence for shipment groups
+        ("ROQ review interval param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.default_review_interval_days'", 1),
+        ("ROQ SMA window param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.sma_window_weeks'", 1),
+        ("ROQ min N value param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.min_n_value'", 1),
+        ("ROQ ABC dampener param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.abc_dampener_weeks'", 1),
+        ("ROQ ABC trailing revenue param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.abc_trailing_revenue_weeks'", 1),
+        ("ROQ LCL threshold param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.container_lcl_threshold_pct'", 1),
+        ("ROQ max padding weeks param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.max_padding_weeks_cover'", 1),
+        ("ROQ max pull days param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.max_pull_days'", 1),
+        ("ROQ MOQ enforcement param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.enable_moq_enforcement'", 1),
+        ("ROQ calendar consolidation window param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.calendar.consolidation_window_days'", 1),
+        ("ROQ reschedule threshold param",
+         "SELECT COUNT(*) FROM ir_config_parameter WHERE key = 'roq.calendar.reschedule_threshold_days'", 1),
+        # Sequences
         ("SG sequence exists",
          "SELECT COUNT(*) FROM ir_sequence WHERE code = 'roq.shipment.group'", 1),
+        ("ROQ run sequence exists",
+         "SELECT COUNT(*) FROM ir_sequence WHERE code = 'roq.forecast.run'", 1),
     ]
 
     for name, query, expected in checks:
