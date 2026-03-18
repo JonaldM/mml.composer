@@ -37,7 +37,7 @@
 - `mml_edi`: `mml.edi/` at repo root (technical name = `mml_edi`, dir name on server must be `mml_edi`)
 
 ### SSH notes
-- `jono` has full sudo (`(ALL : ALL) ALL`) with password `***REMOVED***`. Use `echo '***REMOVED***' | sudo -S <cmd>` for any privileged command.
+- `jono` has full sudo (`(ALL : ALL) ALL`) with password `Lockitdown456`. Use `echo 'Lockitdown456' | sudo -S <cmd>` for any privileged command.
 - **The SSH connection can drop intermittently** (remote host closes socket mid-session). Always wrap multi-step scripts with reconnect logic: check `ssh.get_transport().is_active()` before each command; if not active, reconnect and retry. Set `keepalive` on the transport: `ssh.get_transport().set_keepalive(30)`.
 
 ### SSH helper (use throughout)
@@ -47,7 +47,7 @@ import paramiko, sys
 def ssh():
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    c.connect('10.0.0.35', username='jono', password='***REMOVED***', timeout=15)
+    c.connect('10.0.0.35', username='jono', password='Lockitdown456', timeout=15)
     c.get_transport().set_keepalive(30)
     return c
 
@@ -70,7 +70,7 @@ def run(client, cmd, timeout=60):
 **Step 1: Verify test DB exists and Harold's DB is untouched**
 ```python
 client = ssh()
-out, _ = run(client, "echo '***REMOVED***' | sudo -S -u postgres psql -l 2>&1")
+out, _ = run(client, "echo 'Lockitdown456' | sudo -S -u postgres psql -l 2>&1")
 print(out)
 client.close()
 ```
@@ -89,7 +89,7 @@ If less than 10 GB free, STOP and report.
 **Step 3: Check Odoo 19 service is running**
 ```python
 client = ssh()
-out, _ = run(client, "echo '***REMOVED***' | sudo -S systemctl is-active odoo19 2>&1")
+out, _ = run(client, "echo 'Lockitdown456' | sudo -S systemctl is-active odoo19 2>&1")
 print(out)
 client.close()
 ```
@@ -98,7 +98,7 @@ Expected: `active`. If not active, report before continuing.
 **Step 4: Confirm Harold's active connections (so we don't interrupt)**
 ```python
 client = ssh()
-out, _ = run(client, "echo '***REMOVED***' | sudo -S -u postgres psql -c \"SELECT count(*) FROM pg_stat_activity WHERE datname='MML_Test_Odoo19_02102026';\" 2>&1")
+out, _ = run(client, "echo 'Lockitdown456' | sudo -S -u postgres psql -c \"SELECT count(*) FROM pg_stat_activity WHERE datname='MML_Test_Odoo19_02102026';\" 2>&1")
 print(out)
 client.close()
 ```
@@ -115,7 +115,7 @@ Note the connection count. If > 15 active, flag it but continue (Harold may be r
 **Step 1: Create the new empty database**
 ```python
 client = ssh()
-out, err = run(client, "echo '***REMOVED***' | sudo -S -u postgres createdb -O odoo -E UTF8 MML_EDI_Compat 2>&1")
+out, err = run(client, "echo 'Lockitdown456' | sudo -S -u postgres createdb -O odoo -E UTF8 MML_EDI_Compat 2>&1")
 print(out, err)
 client.close()
 ```
@@ -126,7 +126,7 @@ Expected: No error output. The DB is created.
 client = ssh()
 # Dump to file first, then restore — more reliable than piping on a live DB
 out, err = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres pg_dump MML_Test_Odoo19_02102026 -Fc -f /tmp/mml_compat_dump.pgc 2>&1",
+    "echo 'Lockitdown456' | sudo -S -u postgres pg_dump MML_Test_Odoo19_02102026 -Fc -f /tmp/mml_compat_dump.pgc 2>&1",
     timeout=600
 )
 print("DUMP:", out[:500], err[:500])
@@ -138,7 +138,7 @@ Expected: No errors. `/tmp/mml_compat_dump.pgc` exists on the server.
 ```python
 client = ssh()
 out, err = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres pg_restore -d MML_EDI_Compat /tmp/mml_compat_dump.pgc 2>&1",
+    "echo 'Lockitdown456' | sudo -S -u postgres pg_restore -d MML_EDI_Compat /tmp/mml_compat_dump.pgc 2>&1",
     timeout=600
 )
 print("RESTORE:", out[:1000], err[:1000])
@@ -150,7 +150,7 @@ Expected: Some warnings about `odoo` role ownership are normal. Fatal errors are
 ```python
 client = ssh()
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"SELECT count(*) FROM ir_module_module WHERE state='installed';\" 2>&1"
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"SELECT count(*) FROM ir_module_module WHERE state='installed';\" 2>&1"
 )
 print(out)
 client.close()
@@ -215,7 +215,7 @@ Expected: Both `mml_base/` and `mml_edi/` listed. Each shows `__manifest__.py`, 
 **Step 4: Make files readable by the odoo user**
 ```python
 client = ssh()
-run(client, "echo '***REMOVED***' | sudo -S chmod -R a+rX /tmp/mml_compat/")
+run(client, "echo 'Lockitdown456' | sudo -S chmod -R a+rX /tmp/mml_compat/")
 client.close()
 ```
 
@@ -236,10 +236,10 @@ The addons path extends the configured path with our temp dir.
 
 ```python
 client = ssh()
-out, err = run(client, "echo '***REMOVED***' | sudo -S systemctl stop odoo19 2>&1")
+out, err = run(client, "echo 'Lockitdown456' | sudo -S systemctl stop odoo19 2>&1")
 print(out, err)
 # Verify it stopped
-out2, _ = run(client, "echo '***REMOVED***' | sudo -S systemctl is-active odoo19 2>&1")
+out2, _ = run(client, "echo 'Lockitdown456' | sudo -S systemctl is-active odoo19 2>&1")
 print("Status:", out2)
 client.close()
 ```
@@ -256,7 +256,7 @@ ADDONS_PATH = (
 )
 
 cmd = (
-    f"echo '***REMOVED***' | sudo -S -u odoo "
+    f"echo 'Lockitdown456' | sudo -S -u odoo "
     f"/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
     f"-c /etc/odoo/odoo19.conf "
     f"--addons-path={ADDONS_PATH} "
@@ -297,7 +297,7 @@ Expected outcome:
 ```python
 client = ssh()
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat "
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat "
     "-c \"SELECT name, state, latest_version FROM ir_module_module WHERE name='mml_base';\" 2>&1"
 )
 print(out)
@@ -325,7 +325,7 @@ ADDONS_PATH = (
 )
 
 cmd = (
-    f"echo '***REMOVED***' | sudo -S -u odoo "
+    f"echo 'Lockitdown456' | sudo -S -u odoo "
     f"/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
     f"-c /etc/odoo/odoo19.conf "
     f"--addons-path={ADDONS_PATH} "
@@ -360,7 +360,7 @@ for l in deprecations[:20]: print(" ", l)
 ```python
 client = ssh()
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat "
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat "
     "-c \"SELECT name, state, latest_version FROM ir_module_module WHERE name IN ('mml_base','mml_edi') ORDER BY name;\" 2>&1"
 )
 print(out)
@@ -382,7 +382,7 @@ queries = [
     "SELECT count(*) FROM ir_ui_menu WHERE complete_name LIKE '%EDI%';",
 ]
 for q in queries:
-    o, _ = run(client, f"echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"{q}\" 2>&1")
+    o, _ = run(client, f"echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"{q}\" 2>&1")
     print(q)
     print(o)
 client.close()
@@ -391,7 +391,7 @@ client.close()
 **Step 5: Run Odoo integration tests for mml_edi**
 ```python
 cmd = (
-    f"echo '***REMOVED***' | sudo -S -u odoo "
+    f"echo 'Lockitdown456' | sudo -S -u odoo "
     f"/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
     f"-c /etc/odoo/odoo19.conf "
     f"--addons-path={ADDONS_PATH} "
@@ -419,7 +419,7 @@ client.close()
 ```python
 client = ssh()
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S tail -100 /var/log/odoo19/odoo.log 2>&1 | grep -E 'ERROR|CRITICAL'"
+    "echo 'Lockitdown456' | sudo -S tail -100 /var/log/odoo19/odoo.log 2>&1 | grep -E 'ERROR|CRITICAL'"
 )
 print(out if out else "No errors in log tail")
 client.close()
@@ -436,7 +436,7 @@ client.close()
 client = ssh()
 out, _ = run(client,
     "/opt/odoo19/venv/bin/python3 --version && "
-    "echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat "
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat "
     "-c \"SELECT latest_version FROM ir_module_module WHERE name='mml_edi';\" 2>&1"
 )
 print(out)
@@ -447,7 +447,7 @@ client.close()
 ```python
 client = ssh()
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat "
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat "
     "-c \"SELECT cron_name, failure_count, first_failure_date FROM ir_cron WHERE (name LIKE '%EDI%' OR cron_name LIKE '%EDI%' OR cron_name LIKE '%FTP%') AND failure_count > 0;\" 2>&1"
 )
 print(out if out else "No cron failures")
@@ -475,11 +475,11 @@ After running the above, produce a report with:
 client = ssh()
 # Must disconnect all sessions first
 run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql "
+    "echo 'Lockitdown456' | sudo -S -u postgres psql "
     "-c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='MML_EDI_Compat';\" 2>&1"
 )
 out, err = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres dropdb MML_EDI_Compat 2>&1"
+    "echo 'Lockitdown456' | sudo -S -u postgres dropdb MML_EDI_Compat 2>&1"
 )
 print(out, err)
 client.close()
@@ -489,7 +489,7 @@ Expected: No error. DB dropped.
 **Step 2: Remove temp module files**
 ```python
 client = ssh()
-out, err = run(client, "echo '***REMOVED***' | sudo -S rm -rf /tmp/mml_compat/ 2>&1")
+out, err = run(client, "echo 'Lockitdown456' | sudo -S rm -rf /tmp/mml_compat/ 2>&1")
 print(out, err)
 client.close()
 ```
@@ -497,9 +497,9 @@ client.close()
 **Step 3: Restart Odoo 19**
 ```python
 client = ssh()
-out, err = run(client, "echo '***REMOVED***' | sudo -S systemctl start odoo19 2>&1")
+out, err = run(client, "echo 'Lockitdown456' | sudo -S systemctl start odoo19 2>&1")
 import time; time.sleep(5)
-out2, _ = run(client, "echo '***REMOVED***' | sudo -S systemctl is-active odoo19 2>&1")
+out2, _ = run(client, "echo 'Lockitdown456' | sudo -S systemctl is-active odoo19 2>&1")
 print("Odoo 19 status:", out2)
 client.close()
 ```
@@ -510,7 +510,7 @@ Expected: `active`.
 client = ssh()
 # Confirm MML_Test_Odoo19_02102026 still exists and is healthy
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql -l 2>&1"
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -l 2>&1"
 )
 has_test_db = 'MML_Test_Odoo19_02102026' in out
 has_compat  = 'MML_EDI_Compat' in out
@@ -525,7 +525,7 @@ Expected: `True` and `True`.
 import time; time.sleep(10)
 client = ssh()
 out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S tail -30 /var/log/odoo19/odoo.log 2>&1 | grep -E 'ERROR|CRITICAL|odoo.service'"
+    "echo 'Lockitdown456' | sudo -S tail -30 /var/log/odoo19/odoo.log 2>&1 | grep -E 'ERROR|CRITICAL|odoo.service'"
 )
 print(out if out else "Clean startup — no errors")
 client.close()
@@ -555,7 +555,7 @@ rc, out, _ = run(client, "/opt/odoo19/venv/bin/pip show cryptography 2>&1")
 print("cryptography:", out[:200] if rc == 0 else "NOT INSTALLED")
 if rc != 0:
     rc2, out2, err2 = run(client,
-        "echo '***REMOVED***' | sudo -S /opt/odoo19/venv/bin/pip install cryptography 2>&1",
+        "echo 'Lockitdown456' | sudo -S /opt/odoo19/venv/bin/pip install cryptography 2>&1",
         timeout=120
     )
     print("install rc:", rc2, out2[-300:])
@@ -591,10 +591,10 @@ client.close()
 ### Step 4: Stop odoo19, install stock_3pl_core
 ```python
 client = connect()
-run(client, "echo '***REMOVED***' | sudo -S systemctl stop odoo19.service 2>&1")
+run(client, "echo 'Lockitdown456' | sudo -S systemctl stop odoo19.service 2>&1")
 
 cmd = (
-    "echo '***REMOVED***' | sudo -S -u odoo "
+    "echo 'Lockitdown456' | sudo -S -u odoo "
     "/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
     "-c /tmp/odoo19_edi_compat.conf "
     "-i stock_3pl_core "
@@ -612,7 +612,7 @@ Expected: `Modules loaded.` with no ERRORs from stock_3pl_core.
 ```python
 client = connect()
 cmd = (
-    "echo '***REMOVED***' | sudo -S -u odoo "
+    "echo 'Lockitdown456' | sudo -S -u odoo "
     "/opt/odoo19/venv/bin/python3 /opt/odoo19/odoo-bin "
     "-c /tmp/odoo19_edi_compat.conf "
     "-i stock_3pl_mainfreight "
@@ -628,13 +628,13 @@ client.close()
 ### Step 6: Restart odoo19 and verify
 ```python
 client = connect()
-run(client, "echo '***REMOVED***' | sudo -S systemctl start odoo19.service 2>&1")
+run(client, "echo 'Lockitdown456' | sudo -S systemctl start odoo19.service 2>&1")
 time.sleep(5)
-rc, out, _ = run(client, "echo '***REMOVED***' | sudo -S systemctl is-active odoo19.service 2>&1")
+rc, out, _ = run(client, "echo 'Lockitdown456' | sudo -S systemctl is-active odoo19.service 2>&1")
 print("service:", out)
 
 rc, out, _ = run(client,
-    "echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat "
+    "echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat "
     "-c \"SELECT name, state FROM ir_module_module "
     "WHERE name IN ('mml_base','mml_edi','stock_3pl_core','stock_3pl_mainfreight') ORDER BY name;\" 2>&1"
 )
@@ -658,7 +658,7 @@ checks = [
 ]
 for q in checks:
     rc, out, _ = run(client,
-        f"echo '***REMOVED***' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"{q}\" 2>&1"
+        f"echo 'Lockitdown456' | sudo -S -u postgres psql -d MML_EDI_Compat -c \"{q}\" 2>&1"
     )
     print(q[:60], "->", out.strip())
 client.close()
