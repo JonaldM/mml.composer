@@ -49,8 +49,11 @@ htmlcov/
 barcodes/*.docx
 docs/preview/
 
-# Sensitive files
+# Deployment script secrets
+.env
 ssh.txt
+*.pem
+*.key
 
 # Throwaway agent scripts (server-side patching helpers)
 patch_*.py
