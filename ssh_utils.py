@@ -47,6 +47,7 @@ def sudo_run(client: paramiko.SSHClient, cmd: str, timeout: int = 120):
     out = stdout.read().decode("utf-8", errors="replace").strip()
     err = stderr.read().decode("utf-8", errors="replace").strip()
     out_clean = "\n".join(l for l in out.splitlines() if not l.startswith("[sudo]"))
+    err_clean = "\n".join(l for l in err.splitlines() if not l.startswith("[sudo]"))
     return rc, out_clean, err_clean
 
 
