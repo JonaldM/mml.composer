@@ -169,14 +169,14 @@ Then replace each inline `sudo -S` call (lines 29, 31, 46, 68). Example:
 
 Before:
 ```python
-rc, out, err = run(client, "echo 'Lockitdown456' | sudo -S systemctl start odoo19.service 2>&1")
+rc, out, err = run(client, "echo '***REDACTED***' | sudo -S systemctl start odoo19.service 2>&1")
 ```
 After:
 ```python
 rc, out, err = sudo_run(client, "systemctl start odoo19.service")
 ```
 
-Apply the same pattern to all four `sudo` calls. The `psql` calls that also use `echo 'Lockitdown456' | sudo -S -u postgres` follow the same pattern.
+Apply the same pattern to all four `sudo` calls. The `psql` calls that also use `echo '***REDACTED***' | sudo -S -u postgres` follow the same pattern.
 
 - [ ] **Step 7: Strip git history with BFG Repo-Cleaner**
 
@@ -188,8 +188,8 @@ git clone --mirror <repo-url> repo-mirror.git
 cd repo-mirror.git
 
 # 2. Create replacement file (one literal per line)
-echo "Lockitdown456" > /tmp/passwords.txt   # WSL/Linux/macOS
-# On Windows native: echo Lockitdown456 > %TEMP%\passwords.txt
+echo "***REDACTED***" > /tmp/passwords.txt   # WSL/Linux/macOS
+# On Windows native: echo ***REDACTED*** > %TEMP%\passwords.txt
 
 # 3. Replace all occurrences of the password in blobs
 java -jar bfg.jar --replace-text /tmp/passwords.txt .
