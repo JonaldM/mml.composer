@@ -31,6 +31,15 @@ class BarcodeAllocation(models.Model):
     _order = 'allocation_date desc'
     _rec_name = 'gtin_13'
 
+    # SQL-level partial unique index: only one active allocation per product per company.
+    # The @api.constrains check catches ORM-layer violations, but concurrent transactions
+    # (e.g. simultaneous one-click allocations for the same product from two browser tabs)
+    # can bypass it. This constraint enforces uniqueness atomically at the database level.
+    _unique_active_allocation = models.Constraint(
+        "UNIQUE(product_id, company_id) WHERE status = 'active'",
+        'A product can only have one active barcode allocation per company.',
+    )
+
     registry_id = fields.Many2one(
         'mml.barcode.registry',
         required=True,
