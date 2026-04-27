@@ -116,6 +116,7 @@ mml_roq_forecast, mml_roq_freight, stock_3pl_core, stock_3pl_mainfreight
 
 ---
 
+<<<<<<< HEAD
 ## 2026-04-27 — PW-C Sprint Addendum (Data / Forecasting / Barcode)
 
 **Branch:** `claude-sprint/playwright-modules-data`
@@ -159,3 +160,96 @@ Files added under `mml_test_sprint/modules/data/`.
 | LOW | M1 GST gate (mml_edi) is documentation/log-only — `edi_processor.py:347` notes the ex-GST assumption but never raises. UI cannot assert on a hard rejection until the module enforces a `UserError` when a GST-inclusive pricelist is set on `edi.trading.partner`. |
 | LOW | M2 GST gate (mml_forecast_financial) follows the same pattern — `forecast_generate_wizard.py:242` `logger.warning()` instead of hard rejection. UI workflow records this as `WARN`. |
 | LOW | `mml_edi` Configuration menu (`group_edi_manager`) and barcode `Configuration` menu (`base.group_system`) may be inaccessible to the test user. The smoke tests degrade to `WARN` rather than `FAIL` so the access gap is visible without breaking the run. |
+=======
+## 2026-04-27 Sprint coverage — branch `claude-sprint/playwright-modules-platform`
+
+This sprint adds platform-layer module coverage to the harness. Files
+added under `mml_test_sprint/modules/platform/` and a new
+`mml_test_sprint/helpers/__init__.py` shim. The existing harness API
+is untouched.
+
+### New module results expected after this branch lands
+
+| Module | Result class / runner | Tier coverage |
+|--------|-----------------------|---------------|
+| mml_base (Platform Layer UI) | `platform.test_mml_base.MmlBaseUiTests` | smoke + spec + workflows |
+| mml_petpro_storefront_user | `platform.test_mml_petpro_storefront_user.MmlPetproStorefrontUserTests` | smoke + spec + workflows (SKIP-clean if not installed) |
+| mml_roq_freight (Bridge) | `platform.test_bridges_headless.run_mml_roq_freight_checks` | smoke + spec + workflows (headless SQL only) |
+| mml_freight_3pl (Bridge) | `platform.test_bridges_headless.run_mml_freight_3pl_checks` | smoke + spec + workflows (headless SQL only) |
+
+### Tests added (by tier)
+
+**mml_base smoke**
+- `smoke: Odoo navbar present after login`
+- `smoke: ir.model list reachable for admin`
+- `smoke: ir.model list has no error dialog`
+- `smoke: model mml.capability registered (Capability registry)` (filterable in ir.model list)
+- `smoke: model mml.event registered (Event ledger)`
+- `smoke: model mml.event.subscription registered (Event subscription)`
+- `smoke: model mml.license registered (License cache)`
+- `smoke: dispatch failure model mml.event.dispatch.failure present` (SKIP unless S4 has landed)
+
+**mml_base spec**
+- `spec: mml.capability declares required fields` (name, module, company_id)
+- `spec: mml.event declares required fields` (event_type, source_module, payload_json, quantity, billable_unit, synced_to_platform, timestamp, instance_ref, company_id, res_model, res_id)
+- `spec: mml.event.subscription declares required fields` (event_type, handler_model, handler_method, module)
+- `spec: mml.license declares required fields` (org_ref, license_key, tier, module_grants_json, floor_amount, currency_id, seat_limit, valid_until, last_validated)
+- `spec: mml.event.dispatch.failure declares required fields` (SKIP unless S4 has landed)
+
+**mml_base workflows**
+- `workflow: ACL contract for mml.capability` (group_user=(1,0,0,0), group_system=(1,1,1,1))
+- `workflow: ACL contract for mml.event`
+- `workflow: ACL contract for mml.event.subscription`
+- `workflow: ACL contract for mml.license`
+- `workflow: license_key field restricted to group_system`
+- `workflow: subscription handler_method pattern compliance` (every persisted row matches `^_on_[a-z_]+$`)
+
+**mml_petpro_storefront_user (SKIP-clean if module absent)**
+- `smoke: mml_petpro_storefront_user module installed`
+- `smoke: res.groups list reachable for admin`
+- `spec: 'MML PetPro Storefront' group exists`
+- `spec: res.users template view shipped by module`
+- `workflow: storefront group has minimum-viable ACLs`
+
+**mml_roq_freight (Bridge, headless)**
+- `headless: mml_roq_freight installed`
+- `headless: dependency mml_base installed`
+- `headless: dependency mml_roq_forecast installed`
+- `spec: mml_roq_freight ships no ir.ui.menu (bridge-only)`
+- `workflow: mml_roq_freight registers >= 1 service in mml.registry`
+
+**mml_freight_3pl (Bridge, headless)**
+- Same five checks, with deps `mml_base` and `mml_freight`.
+
+### Test execution
+
+The user runs the actual browser tests by invoking:
+
+```bash
+cd E:/ClaudeCode/projects/mml.odoo
+python -m mml_test_sprint
+```
+
+To target the canonical Hetzner instance via Tailscale, set the
+`BASE_URL`/`DATABASE`/`LOGIN_EMAIL`/`LOGIN_PASSWORD` constants in
+`mml_test_sprint/config.py` to:
+
+- `BASE_URL = "http://100.94.135.90:8090"`
+- `DATABASE = "MML_19_prod_test"`
+- `LOGIN_EMAIL = "jono@mml.co.nz"`
+- `LOGIN_PASSWORD = "Test123"`
+
+The Hetzner DB is also reachable via SSH for the headless probes — adjust
+`SSH_HOST`/`SSH_USER`/`DB_CONTAINER` accordingly. If SSH is unreachable
+from the runner host, headless checks degrade to WARN (not FAIL) so the
+suite still produces a report.
+
+### Static-validation status (this branch)
+
+- `python -c "import mml_test_sprint.modules.platform.test_mml_base"` — PASS
+- `python -c "import mml_test_sprint.modules.platform.test_mml_petpro_storefront_user"` — PASS
+- `python -c "import mml_test_sprint.modules.platform.test_bridges_headless"` — PASS
+- `python -c "import mml_test_sprint.runner"` — PASS
+
+Live browser execution against Hetzner deferred to operator — see PR body.
+>>>>>>> d41893e (test(mml_base): Playwright smoke + spec coverage for platform layer)

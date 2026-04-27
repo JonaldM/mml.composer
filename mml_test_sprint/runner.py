@@ -4,16 +4,12 @@ MML Module Test Sprint — Main Entry Point
 Usage:
     cd E:/ClaudeCode/projects/mml.odoo
     python -m mml_test_sprint.runner
-
 Output:
     test_results/YYYY-MM-DD/report.html
-"""
 import sys
 from datetime import datetime
 from pathlib import Path
-
 import paramiko
-
 from mml_test_sprint.browser import BrowserSession
 from mml_test_sprint.checks import ModuleResult, Status
 from mml_test_sprint.config import (
@@ -30,8 +26,6 @@ from mml_test_sprint.modules.data.mml_barcode_registry_ext import BarcodeRegistr
 from mml_test_sprint.modules.data.mml_forecast_core import ForecastCoreTests
 from mml_test_sprint.modules.data.mml_forecast_financial import ForecastFinancialTests
 from mml_test_sprint.modules.data.mml_roq_forecast_ext import RoqForecastExtTests
-
-
 def get_installed_modules() -> set:
     """Query mml_dev DB via SSH to find which MML modules are installed."""
     mml_modules = [
@@ -42,7 +36,6 @@ def get_installed_modules() -> set:
     ]
     names_sql = "', '".join(mml_modules)
     query = f"SELECT name FROM ir_module_module WHERE name IN ('{names_sql}') AND state = 'installed'"
-
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -57,37 +50,28 @@ def get_installed_modules() -> set:
     except Exception as e:
         print(f"WARNING: Could not query installed modules ({e}). Assuming all.")
         return set(mml_modules)
-
-
 def not_installed_result(name: str, label: str) -> ModuleResult:
     r = ModuleResult(module_name=name, module_label=label, installed=False)
     return r
-
-
 def main():
     print("\n" + "=" * 70)
     print("  MML Module Test Sprint")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"  Server: {BASE_URL}  |  DB: {DATABASE}")
     print("=" * 70)
-
     installed = get_installed_modules()
     results = []
-
     # ── mml_base headless checks (no browser needed) ────────────────────────
     print("\n[mml_base] Running headless DB checks...")
     if "mml_base" in installed:
         results.append(run_mml_base_checks())
     else:
         results.append(not_installed_result("mml_base", "mml_base (Platform Layer)"))
-
     # ── Browser-based module tests ───────────────────────────────────────────
     session = BrowserSession()
-    try:
         session.start()
         session.login()
         print("  Browser: logged in")
-
         browser_modules = [
             ("mml_roq_forecast", "ROQ Forecast", RoqForecastTests),
             ("mml_barcode_registry", "Barcode Registry", BarcodeRegistryTests),
@@ -100,26 +84,20 @@ def main():
             ("mml_forecast_financial", "Forecast Financial", ForecastFinancialTests),
             ("mml_roq_forecast", "ROQ Forecast (extended)", RoqForecastExtTests),
         ]
-
         for module_name, label, TestClass in browser_modules:
             if module_name in installed:
                 test = TestClass(session)
                 results.append(test.run())
             else:
                 results.append(not_installed_result(module_name, label))
-
     finally:
         session.stop()
-
     # ── Report ───────────────────────────────────────────────────────────────
     date_str = datetime.now().strftime("%Y-%m-%d")
     output_path = RESULTS_DIR / date_str / "report.html"
     generate_html(results, output_path, BASE_URL, DATABASE)
-
     # Print summary
-    print("\n" + "=" * 70)
     print("  SUMMARY")
-    print("=" * 70)
     for r in results:
         if r.installed:
             print(f"  {r.module_label:<30} {r.overall_status.value.upper():<8} "
@@ -128,14 +106,36 @@ def main():
             print(f"  {r.module_label:<30} NOT INSTALLED")
     print(f"\n  Report: {output_path}")
     print("=" * 70 + "\n")
-
     # Exit 1 if any failures
     has_failures = any(
         r.installed and r.overall_status == Status.FAIL
         for r in results
     )
     sys.exit(1 if has_failures else 0)
-
-
 if __name__ == "__main__":
     main()
+# Platform-layer additions (sprint: claude-sprint/playwright-modules-platform)
+from mml_test_sprint.modules.platform.test_mml_base import MmlBaseUiTests
+from mml_test_sprint.modules.platform.test_mml_petpro_storefront_user import (
+    MmlPetproStorefrontUserTests,
+from mml_test_sprint.modules.platform.test_bridges_headless import (
+    run_mml_roq_freight_checks,
+    run_mml_freight_3pl_checks,
+        "mml_petpro_storefront_user",
+    # ── Bridge module headless checks (no UI to test, sprint additions) ─────
+    # These run regardless of browser availability — bridges have no UI.
+    print("\n[mml_roq_freight] Running headless bridge checks...")
+    if "mml_roq_freight" in installed:
+        results.append(run_mml_roq_freight_checks())
+        results.append(not_installed_result("mml_roq_freight", "mml_roq_freight (Bridge)"))
+    print("\n[mml_freight_3pl] Running headless bridge checks...")
+    if "mml_freight_3pl" in installed:
+        results.append(run_mml_freight_3pl_checks())
+        results.append(not_installed_result("mml_freight_3pl", "mml_freight_3pl (Bridge)"))
+            # Platform-layer UI tests (sprint additions)
+            ("mml_base", "mml_base (Platform Layer UI)", MmlBaseUiTests),
+            (
+                "mml_petpro_storefront_user",
+                "MML PetPro Storefront User",
+                MmlPetproStorefrontUserTests,
+            ),
