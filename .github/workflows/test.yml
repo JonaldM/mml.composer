@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run pure-Python tests (top-level modules)
+        # Scoped to top-level dirs with working pure-Python tests. Nested-repo
+        # placeholders (mml.3pl.intergration, mml.fowarder.intergration, etc.)
+        # are empty until the P1 nested-repos restructure lands; once they
+        # become submodules, the `submodules: recursive` checkout above will
+        # pull them in and this list can be expanded (or replaced with `.`).
+        run: pytest -m "not odoo_integration" -q mml_base mml_roq_freight mml_freight_3pl
