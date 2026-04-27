@@ -5,5 +5,7 @@ access_mml_event_user,mml.event user,model_mml_event,base.group_user,1,0,0,0
 access_mml_event_system,mml.event system,model_mml_event,base.group_system,1,1,1,1
 access_mml_event_sub_user,mml.event.subscription user,model_mml_event_subscription,base.group_user,1,0,0,0
 access_mml_event_sub_system,mml.event.subscription system,model_mml_event_subscription,base.group_system,1,1,1,1
+access_mml_event_dispatch_failure_user,mml.event.dispatch.failure user,model_mml_event_dispatch_failure,base.group_user,1,0,0,0
+access_mml_event_dispatch_failure_system,mml.event.dispatch.failure system,model_mml_event_dispatch_failure,base.group_system,1,1,1,1
 access_mml_license_user,mml.license user read,model_mml_license,base.group_user,1,0,0,0
 access_mml_license_system,mml.license system,model_mml_license,base.group_system,1,1,1,1
