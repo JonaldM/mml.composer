@@ -113,3 +113,49 @@ mml_roq_forecast, mml_roq_freight, stock_3pl_core, stock_3pl_mainfreight
 | LOW | `spec: SG form has Confirm & Create Tender button` — always SKIP because no draft Shipment Groups exist in the test DB. Create a draft SG to make this check active. |
 | LOW | ROQ Run `action_confirm` button test — depends on live draft records. |
 | INFO | The `_compute_freight_status` `get_booking_status` method needs to be implemented in `FreightService` (or renamed) to provide live freight status data to the calendar. Currently returns empty fields gracefully. |
+
+---
+
+## 2026-04-27 — PW-C Sprint Addendum (Data / Forecasting / Barcode)
+
+**Branch:** `claude-sprint/playwright-modules-data`
+**Scope:** Playwright UI coverage for `mml_edi`, `mml_barcode_registry`,
+`mml_forecast_core`, `mml_forecast_financial`, `mml_roq_forecast`.
+Files added under `mml_test_sprint/modules/data/`.
+
+### Files Added
+
+| File | Purpose |
+|---|---|
+| `modules/data/__init__.py` | Package marker for the data subpackage |
+| `modules/data/mml_edi.py` | EDI smoke + spec (pricelist_id, format, env, auto-confirm) + workflow (dashboard renders, M1 GST gate observation) |
+| `modules/data/mml_barcode_registry_ext.py` | Extension to existing barcode tests: dashboard, status graph, prefix/brand lists, allocation form fields, search filters, allocate-from-product workflow |
+| `modules/data/mml_forecast_core.py` | App menu + Financial Forecasts list + Origin Ports list; spec for forecast.config form fields, notebook tabs, statusbar |
+| `modules/data/mml_forecast_financial.py` | P&L / Cashflow / Balance Sheet / Variance smoke; Generate Forecast button + KPI strip spec; Generate-clickable workflow + M2 GST gate observation |
+| `modules/data/mml_roq_forecast_ext.py` | Re-tests prior WARNs: Confirm & Create Tender on draft SG; calendar events in next 6 months |
+| `modules/data/README.md` | ~300-word module coverage summary + how to run + what is NOT tested |
+| `playwright/data/` | Reserved for module-scoped Playwright artefacts (screenshots, traces) |
+
+### Runner Integration
+
+`runner.py` was extended additively — five new entries appended to
+`browser_modules`. No existing entries or shared helpers were modified.
+
+### Re-Tests of Prior WARNs
+
+- **Confirm & Create Tender button (SG draft).** Prior 2026-03-11 result: `SKIP`
+  due to no draft SGs in DB. The new workflow iterates kanban + list views
+  for any draft state and verifies the `action_confirm` button. If still
+  no draft SG exists, the check stays a `WARN` flagging the same data gap.
+- **Calendar events within 6 months.** Prior result: `WARN` (June 2026
+  missing before the `target_delivery_date` backfill). The new workflow
+  walks forward up to 6 months from default and asserts at least one
+  `.fc-event` is rendered. Expected to clear after the 2026-03-11 fix.
+
+### Known Gaps (PW-C)
+
+| Priority | Item |
+|---|---|
+| LOW | M1 GST gate (mml_edi) is documentation/log-only — `edi_processor.py:347` notes the ex-GST assumption but never raises. UI cannot assert on a hard rejection until the module enforces a `UserError` when a GST-inclusive pricelist is set on `edi.trading.partner`. |
+| LOW | M2 GST gate (mml_forecast_financial) follows the same pattern — `forecast_generate_wizard.py:242` `logger.warning()` instead of hard rejection. UI workflow records this as `WARN`. |
+| LOW | `mml_edi` Configuration menu (`group_edi_manager`) and barcode `Configuration` menu (`base.group_system`) may be inaccessible to the test user. The smoke tests degrade to `WARN` rather than `FAIL` so the access gap is visible without breaking the run. |
