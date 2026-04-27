@@ -9,6 +9,19 @@ _logger = logging.getLogger(__name__)
 _HANDLER_METHOD_RE = re.compile(r'^_on_[a-z_]+$')
 
 
+def _is_valid_handler_method(name: str) -> bool:
+    """Return True if ``name`` is a safe handler method name.
+
+    The dispatch loop calls ``getattr(model, sub.handler_method)(event)``; permitting
+    arbitrary names would let a malicious or buggy subscription invoke any attribute on
+    the handler model. Constraining to ``^_on_[a-z_]+$`` enforces the convention that
+    event handlers are private hooks named like ``_on_freight_booking_confirmed``.
+    """
+    if not isinstance(name, str):
+        return False
+    return bool(_HANDLER_METHOD_RE.match(name))
+
+
 class MmlEventSubscription(models.Model):
     _name = 'mml.event.subscription'
     _description = 'MML Event Subscription'
@@ -73,7 +86,7 @@ class MmlEventSubscription(models.Model):
         """
         subscriptions = self.search([('event_type', '=', event.event_type)])
         for sub in subscriptions:
-            if not _HANDLER_METHOD_RE.match(sub.handler_method):
+            if not _is_valid_handler_method(sub.handler_method):
                 _logger.error(
                     'mml.event: rejected dispatch to %s.%s — method name does not match '
                     'safe pattern ^_on_[a-z_]+$ (subscription id=%s)',
