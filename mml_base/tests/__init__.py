@@ -5,3 +5,8 @@ from . import test_event_dispatch_exceptions
 from . import test_event_subscription
 from . import test_license
 from . import test_pure_dispatch_isolation
+from . import test_pure_capability_register
+from . import test_pure_event_emit_signature
+from . import test_pure_event_subscription_regex
+from . import test_pure_null_service
+from . import test_pure_registry_constants
