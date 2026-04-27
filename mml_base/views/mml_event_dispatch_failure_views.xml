@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List view: triage queue ordered by recency -->
+    <record id="view_mml_event_dispatch_failure_list" model="ir.ui.view">
+        <field name="name">mml.event.dispatch.failure.list</field>
+        <field name="model">mml.event.dispatch.failure</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="resolved == False"
+                  decoration-muted="resolved == True">
+                <field name="create_date"/>
+                <field name="handler_model"/>
+                <field name="handler_method"/>
+                <field name="error_class"/>
+                <field name="error_message"/>
+                <field name="event_id"/>
+                <field name="resolved" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form view: full traceback for offline debugging -->
+    <record id="view_mml_event_dispatch_failure_form" model="ir.ui.view">
+        <field name="name">mml.event.dispatch.failure.form</field>
+        <field name="model">mml.event.dispatch.failure</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="resolved" widget="boolean_toggle"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Source">
+                            <field name="event_id"/>
+                            <field name="subscription_id"/>
+                            <field name="handler_model"/>
+                            <field name="handler_method"/>
+                        </group>
+                        <group string="Failure">
+                            <field name="error_class"/>
+                            <field name="create_date"/>
+                            <field name="resolved_at"/>
+                            <field name="resolved_by"/>
+                        </group>
+                    </group>
+                    <group string="Error message">
+                        <field name="error_message" nolabel="1" readonly="1"/>
+                    </group>
+                    <group string="Traceback">
+                        <field name="traceback" nolabel="1" readonly="1"
+                               widget="text" class="font-monospace"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search: filter unresolved by default -->
+    <record id="view_mml_event_dispatch_failure_search" model="ir.ui.view">
+        <field name="name">mml.event.dispatch.failure.search</field>
+        <field name="model">mml.event.dispatch.failure</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="handler_model"/>
+                <field name="handler_method"/>
+                <field name="error_class"/>
+                <field name="event_id"/>
+                <filter string="Unresolved" name="unresolved"
+                        domain="[('resolved', '=', False)]"/>
+                <filter string="Resolved" name="resolved"
+                        domain="[('resolved', '=', True)]"/>
+                <group>
+                    <filter string="Handler Model" name="group_handler_model"
+                            context="{'group_by': 'handler_model'}"/>
+                    <filter string="Error Class" name="group_error_class"
+                            context="{'group_by': 'error_class'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: defaults to unresolved triage view -->
+    <record id="action_mml_event_dispatch_failure" model="ir.actions.act_window">
+        <field name="name">Dispatch Failures</field>
+        <field name="res_model">mml.event.dispatch.failure</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_unresolved': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No failed event-handler invocations.
+            </p>
+            <p>
+                When a subscribed handler raises during
+                <code>mml.event.subscription.dispatch()</code>, its Postgres
+                savepoint is rolled back and a failure record is logged here.
+                The producing module's billable event is unaffected.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu: system-only, parented under Settings → Technical so admins
+         find it next to other developer-facing tools. The root menu uses
+         a soft create_or_skip pattern: re-using base.menu_administration
+         when no MML platform menu exists yet. -->
+    <menuitem id="menu_mml_event_dispatch_failure"
+              name="MML Dispatch Failures"
+              parent="base.menu_administration"
+              action="action_mml_event_dispatch_failure"
+              groups="base.group_system"
+              sequence="60"/>
+</odoo>

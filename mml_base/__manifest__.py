@@ -10,6 +10,7 @@
     'data': [
         'security/ir.model.access.csv',
         'data/ir_cron.xml',
+        'views/mml_event_dispatch_failure_views.xml',
     ],
     'post_init_hook': 'post_init_hook',
     'uninstall_hook': 'uninstall_hook',
