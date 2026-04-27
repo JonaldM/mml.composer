@@ -24,6 +24,12 @@ from mml_test_sprint.report import generate_html
 from mml_test_sprint.modules.mml_roq_forecast import RoqForecastTests
 from mml_test_sprint.modules.mml_barcode_registry import BarcodeRegistryTests
 from mml_test_sprint.modules.mml_base_platform import run_mml_base_checks
+# PW-C: data / forecasting / barcode module extensions
+from mml_test_sprint.modules.data.mml_edi import EdiTests
+from mml_test_sprint.modules.data.mml_barcode_registry_ext import BarcodeRegistryExtTests
+from mml_test_sprint.modules.data.mml_forecast_core import ForecastCoreTests
+from mml_test_sprint.modules.data.mml_forecast_financial import ForecastFinancialTests
+from mml_test_sprint.modules.data.mml_roq_forecast_ext import RoqForecastExtTests
 
 
 def get_installed_modules() -> set:
@@ -85,6 +91,14 @@ def main():
         browser_modules = [
             ("mml_roq_forecast", "ROQ Forecast", RoqForecastTests),
             ("mml_barcode_registry", "Barcode Registry", BarcodeRegistryTests),
+            # PW-C additions (data / forecasting / barcode extensions).
+            # Each maps to an installed Odoo module on the test target;
+            # gated by the same `installed` set as the existing modules.
+            ("mml_edi", "EDI Engine", EdiTests),
+            ("mml_barcode_registry", "Barcode Registry (extended)", BarcodeRegistryExtTests),
+            ("mml_forecast_core", "Forecast Core", ForecastCoreTests),
+            ("mml_forecast_financial", "Forecast Financial", ForecastFinancialTests),
+            ("mml_roq_forecast", "ROQ Forecast (extended)", RoqForecastExtTests),
         ]
 
         for module_name, label, TestClass in browser_modules:
