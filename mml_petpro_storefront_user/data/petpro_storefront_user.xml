@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    res.users template for the PetPro storefront RPC account.
+
+    INTENTIONALLY: not noupdate=1.
+        We want module upgrades to keep this user's group membership in sync
+        with whatever the current ACLs declare. If a future upgrade tightens
+        permissions, the operator should not have to re-link the user.
+
+    INTENTIONALLY: forcecreate="1".
+        On first install of a fresh database, this record must be created.
+        On databases where the user already exists at this XML id, the
+        record is merely refreshed (group membership re-asserted).
+
+    INTENTIONALLY: NO password field.
+        A password set in this XML would (a) leak in source control, (b) be
+        the same on every deployment, and (c) be impossible to rotate.
+        Instead the operator MUST set a password (and an Odoo 19 API key)
+        out-of-band immediately after install. See:
+            docs/operations/2026-04-27-petpro-storefront-user-runbook.md
+
+        Until that step is complete this user CANNOT log in. That is by
+        design — fail closed.
+-->
+<odoo>
+    <record id="user_petpro_storefront" model="res.users" forcecreate="1">
+        <field name="name">MML PetPro Storefront</field>
+        <field name="login">petpro_storefront@petpro.co.nz</field>
+        <field name="email">petpro_storefront@petpro.co.nz</field>
+        <field name="active">True</field>
+        <field name="share">False</field>
+        <field name="notification_type">email</field>
+        <field name="signature">PetPro Storefront RPC user — system generated. Do not reply.</field>
+        <field name="groups_id" eval="[
+            (6, 0, [
+                ref('base.group_user'),
+                ref('mml_petpro_storefront_user.group_petpro_storefront'),
+            ])
+        ]"/>
+    </record>
+</odoo>

@@ -39,12 +39,21 @@ mml.odoo.apps/
 ├── mml_edi/                             ← EDI engine: mml_edi Odoo module + legacy .NET binaries
 ├── mml.barcodes/
 │   └── mml_barcode_registry/            ← Barcode registry module
-└── mml.forecasting/
-    ├── mml_forecast_core/               ← Core forecasting engine
-    └── mml_forecast_financial/          ← Financial forecasting layer
+├── mml.forecasting/
+│   ├── mml_forecast_core/               ← Core forecasting engine
+│   └── mml_forecast_financial/          ← Financial forecasting layer
+└── mml_petpro_storefront_user/          ← Min-priv RPC user for the headless petpro.co.nz storefront (groups + ACLs only)
 ```
 
 **Note on typos:** `mml.fowarder.intergration` and `mml.3pl.intergration` are intentional directory names (typos preserved from original repo history).
+
+### Storefront RPC convention
+
+The headless `pet.pro.website` (Next.js) connects to Odoo as a *dedicated*
+least-privilege user — `petpro_storefront@petpro.co.nz` — defined by the
+`mml_petpro_storefront_user` module. **Do not** point the storefront at the
+Odoo admin account. Operator runbook for switching credentials:
+`docs/operations/2026-04-27-petpro-storefront-user-runbook.md`.
 
 ---
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!--
+        Group: MML PetPro Storefront
+
+        Membership of this group is the *only* thing that grants the
+        storefront RPC user any model access. The user record (see
+        data/petpro_storefront_user.xml) is the sole intended member.
+        Do NOT add real human users to this group.
+
+        Categorised under base.module_category_hidden so it does not
+        appear in the standard "Settings → Users → Access Rights"
+        access-rights matrix as a normal application group. Operators
+        manage it directly on the user form.
+    -->
+    <record id="group_petpro_storefront" model="res.groups">
+        <field name="name">MML PetPro Storefront</field>
+        <field name="category_id" ref="base.module_category_hidden"/>
+        <field name="comment">Minimum-privilege role for the headless PetPro Next.js storefront RPC account. Grants read access to the catalogue and stock, plus narrow read/write/create on sale.order, sale.order.line, and res.partner (for guest delivery addresses). Never grant to a real user.</field>
+    </record>
+</odoo>
