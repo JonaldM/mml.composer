@@ -1,6 +1,6 @@
 {
     'name': 'MML Base Platform',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'summary': 'Event bus, capability registry, service locator, and billing ledger for MML modules',
     'author': 'MML Consumer Products Ltd',
     'website': 'https://www.mmlconsumerproducts.co.nz',
