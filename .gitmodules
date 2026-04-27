@@ -1,0 +1,15 @@
+[submodule "mml.3pl.intergration"]
+	path = mml.3pl.intergration
+	url = https://github.com/JonaldM/mml.3pl.odoo.git
+[submodule "mml.fowarder.intergration"]
+	path = mml.fowarder.intergration
+	url = https://github.com/JonaldM/mml.freight.fowarder.git
+[submodule "mml.forecasting"]
+	path = mml.forecasting
+	url = https://github.com/JonaldM/mml.forecasting.git
+[submodule "mml.roq.model"]
+	path = mml.roq.model
+	url = https://github.com/JonaldM/mml.roq.odoo.git
+[submodule "mml_edi"]
+	path = mml_edi
+	url = https://github.com/JonaldM/mml.edi.odoo.git

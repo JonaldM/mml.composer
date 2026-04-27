@@ -241,6 +241,34 @@ run.get_demand_forecast(date_start: date, horizon_months: int) -> list[dict]
 
 ---
 
+## Submodule layout
+
+Five of the directories above are **git submodules** of separate sister repos.
+The parent (this repo) pins each to a specific commit; the sub-repos are
+where day-to-day development happens.
+
+| Submodule path | Sub-repo |
+|---|---|
+| `mml.3pl.intergration` | [JonaldM/mml.3pl.odoo](https://github.com/JonaldM/mml.3pl.odoo) |
+| `mml.fowarder.intergration` | [JonaldM/mml.freight.fowarder](https://github.com/JonaldM/mml.freight.fowarder) |
+| `mml.forecasting` | [JonaldM/mml.forecasting](https://github.com/JonaldM/mml.forecasting) |
+| `mml.roq.model` | [JonaldM/mml.roq.odoo](https://github.com/JonaldM/mml.roq.odoo) |
+| `mml_edi` | [JonaldM/mml.edi.odoo](https://github.com/JonaldM/mml.edi.odoo) |
+
+```bash
+# Clone fresh
+git clone --recurse-submodules https://github.com/JonaldM/mml.composer.git
+
+# Or, if already cloned:
+git submodule update --init --recursive
+```
+
+Per-submodule changes go through the sub-repo's own PR first; the parent then
+bumps the pointer in a follow-up commit. Full workflow:
+[`docs/operations/submodules-howto.md`](docs/operations/submodules-howto.md).
+
+---
+
 ## Related Repositories
 
 | Repo | GitHub | What's in it |
