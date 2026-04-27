@@ -136,6 +136,37 @@ svc = self.env['mml.registry'].service('freight_service')
 svc.do_thing(...)  # silently no-ops if mml_freight is not installed
 ```
 
+### 7. Idempotent emit (billing-safe)
+
+The `mml.event` ledger doubles as the SaaS billing meter, so duplicate
+emits (network retries, dual-call paths, cron reruns) inflate billing.
+For any logical event that may fire more than once for the same domain
+state, use `emit_idempotent()` with a stable `dedupe_key`:
+
+```python
+self.env['mml.event'].emit_idempotent(
+    'freight.booking.confirmed',
+    dedupe_key=f'mml_freight:freight.booking:{booking.id}:confirmed',
+    quantity=1,
+    billable_unit='freight_booking',
+    res_model='freight.booking',
+    res_id=booking.id,
+    payload={'ref': booking.name},
+    source_module='mml_freight',
+)
+```
+
+If `dedupe_key` was already used, the existing event is returned and
+**no new row is created** — `dispatch()` only fires on the first emit.
+A partial `UNIQUE` index on `mml_event(dedupe_key) WHERE dedupe_key IS
+NOT NULL` (added in `19.0.1.1.0`) protects against concurrent
+duplicates at the database level.
+
+Use plain `emit()` only when no stable key is available (e.g. an
+ad-hoc telemetry event with no domain anchor). Mixing the two is
+fine: rows from `emit()` carry `dedupe_key = NULL` and are exempt from
+the partial UNIQUE index.
+
 ---
 
 ## Tests

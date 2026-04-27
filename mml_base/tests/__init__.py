@@ -10,3 +10,4 @@ from . import test_pure_event_emit_signature
 from . import test_pure_event_subscription_regex
 from . import test_pure_null_service
 from . import test_pure_registry_constants
+from . import test_pure_event_idempotent_emit
