@@ -27,6 +27,13 @@ class BarcodeService:
             ('product_id', '=', product_id),
             ('status', '=', 'active'),
         ], limit=1, order='id desc')
+        if not allocation:
+            from odoo.exceptions import UserError
+            raise UserError(
+                f'Barcode allocation for product {product_id} failed: '
+                'no active allocation found after action_allocate_barcode(). '
+                'Check barcode pool availability.'
+            )
         return {
             'gtin_13': allocation.gtin_13,
             'gtin_14': allocation.registry_id.gtin_14,

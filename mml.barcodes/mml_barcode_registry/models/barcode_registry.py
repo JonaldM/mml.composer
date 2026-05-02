@@ -135,17 +135,17 @@ class BarcodeRegistry(models.Model):
     def action_reserve(self):
         for rec in self:
             rec._validate_transition('reserved')
-            rec.status = 'reserved'
+            rec.write({'status': 'reserved'})
 
     def action_unreserve(self):
         for rec in self:
             rec._validate_transition('unallocated')
-            rec.status = 'unallocated'
+            rec.write({'status': 'unallocated'})
 
     def action_retire(self):
         for rec in self:
             rec._validate_transition('retired')
-            rec.status = 'retired'
+            rec.write({'status': 'retired'})
 
     def action_return_to_pool(self):
         """Move retired registry record back to unallocated. Requires 48-month cool-down."""
@@ -165,5 +165,7 @@ class BarcodeRegistry(models.Model):
                     f"To obtain new GTINs now, apply for an additional prefix block at "
                     f"https://www.gs1nz.org/"
                 )
-            rec.status = 'unallocated'
-            rec.current_allocation_id = False
+            rec.write({
+                'status': 'unallocated',
+                'current_allocation_id': False,
+            })

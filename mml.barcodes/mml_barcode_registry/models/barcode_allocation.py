@@ -162,8 +162,15 @@ class BarcodeAllocation(models.Model):
             rec.write({'status': 'discontinued'})
             # Return registry slot to pool if this is the active allocation
             registry = rec.registry_id
-            if registry.current_allocation_id == rec:
-                registry.write({
+            # Only clear the registry slot if this allocation is still the current one.
+            # Filters on both id and current_allocation_id to avoid a TOCTOU window
+            # where a concurrent allocation has already claimed the slot.
+            registry_to_clear = self.env['mml.barcode.registry'].search([
+                ('id', '=', registry.id),
+                ('current_allocation_id', '=', rec.id),
+            ])
+            if registry_to_clear:
+                registry_to_clear.write({
                     'status': 'unallocated',
                     'current_allocation_id': False,
                 })
