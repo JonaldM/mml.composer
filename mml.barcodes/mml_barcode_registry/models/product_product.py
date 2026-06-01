@@ -134,10 +134,12 @@ class ProductProduct(models.Model):
         # 6. Write GTIN-13 to product barcode field
         self.write({'barcode': registry.gtin_13})
 
-        # 7. Create GTIN-14 outer carton packaging record
+        # 7. Create GTIN-14 outer carton packaging record.
+        # In Odoo 17+, product.packaging.product_id points to product.template,
+        # not product.product. Use product_tmpl_id to get the template ID.
         self.env['product.packaging'].create({
             'name': 'Outer Carton',
-            'product_id': self.id,
+            'product_id': self.product_tmpl_id.id,
             'barcode': registry.gtin_14,
             'qty': 1.0,
         })

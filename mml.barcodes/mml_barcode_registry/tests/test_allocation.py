@@ -94,8 +94,9 @@ class TestOneClickAllocation(TransactionCase):
 
     def test_allocate_creates_packaging(self):
         self.product.action_allocate_barcode()
+        # In Odoo 17+, product.packaging.product_id -> product.template
         packaging = self.env['product.packaging'].search([
-            ('product_id', '=', self.product.id),
+            ('product_id', '=', self.product.product_tmpl_id.id),
             ('name', '=', 'Outer Carton'),
         ])
         self.assertTrue(packaging)

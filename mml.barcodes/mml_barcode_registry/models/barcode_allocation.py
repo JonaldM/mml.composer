@@ -31,14 +31,16 @@ class BarcodeAllocation(models.Model):
     _order = 'allocation_date desc'
     _rec_name = 'gtin_13'
 
-    # SQL-level partial unique index: only one active allocation per product per company.
-    # The @api.constrains check catches ORM-layer violations, but concurrent transactions
-    # (e.g. simultaneous one-click allocations for the same product from two browser tabs)
-    # can bypass it. This constraint enforces uniqueness atomically at the database level.
-    _unique_active_allocation = models.Constraint(
-        "UNIQUE(product_id, company_id) WHERE status = 'active'",
-        'A product can only have one active barcode allocation per company.',
-    )
+    # Partial unique index (WHERE status = 'active') cannot be expressed via
+    # _sql_constraints (which maps to CHECK CONSTRAINTs, not partial indexes).
+    # models.Constraint was removed in favour of _sql_constraints in Odoo 19;
+    # the v17 models.Constraint API that accepted a WHERE clause caused
+    # TypeError: issubclass() arg 1 must be a class during metaclass processing.
+    # The ORM-level @api.constrains _check_unique_active_allocation below enforces
+    # uniqueness for normal operations.
+    # For PostgreSQL-level race protection, apply this migration once after install:
+    #   CREATE UNIQUE INDEX IF NOT EXISTS barcode_alloc_active_uniq
+    #   ON mml_barcode_allocation (product_id, company_id) WHERE status = 'active';
 
     registry_id = fields.Many2one(
         'mml.barcode.registry',
