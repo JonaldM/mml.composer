@@ -205,7 +205,7 @@ class TestUniqueActiveAllocation(TransactionCase):
         })
 
         registry2 = self._get_unallocated()
-        with self.assertRaises((ValidationError, UserError)):
+        with self.assertRaises(UserError):
             self.env['mml.barcode.allocation'].create({
                 'registry_id': registry2.id,
                 'product_id': self.product.id,

@@ -184,7 +184,7 @@ class TestAllocationLifecycle(TransactionCase):
     def test_blank_sequence_rejected(self):
         """Empty sequence must not be saveable."""
         from odoo.exceptions import ValidationError
-        with self.assertRaises((ValidationError, Exception)):
+        with self.assertRaises(Exception):
             self.env['mml.barcode.registry'].create({
                 'sequence': '',
                 'prefix_id': self.prefix.id,
@@ -195,7 +195,7 @@ class TestAllocationLifecycle(TransactionCase):
     def test_non_numeric_sequence_rejected(self):
         """Non-digit sequence must be rejected."""
         from odoo.exceptions import ValidationError
-        with self.assertRaises((ValidationError, Exception)):
+        with self.assertRaises(Exception):
             self.env['mml.barcode.registry'].create({
                 'sequence': 'ABCD12345678',
                 'prefix_id': self.prefix.id,
@@ -206,7 +206,7 @@ class TestAllocationLifecycle(TransactionCase):
     def test_wrong_length_sequence_rejected(self):
         """Sequence must be exactly 12 digits."""
         from odoo.exceptions import ValidationError
-        with self.assertRaises((ValidationError, Exception)):
+        with self.assertRaises(Exception):
             self.env['mml.barcode.registry'].create({
                 'sequence': '12345',
                 'prefix_id': self.prefix.id,
