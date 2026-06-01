@@ -3,7 +3,12 @@ Tests for mml_freight_3pl bridge module.
 Pure-Python structural tests run with plain pytest.
 Odoo integration tests require --test-enable.
 """
-import pytest
+try:
+    import pytest as _pytest
+    _odoo_integration = _pytest.mark.odoo_integration
+except ImportError:
+    def _odoo_integration(cls):
+        return cls
 
 try:
     from odoo.tests.common import TransactionCase
@@ -54,7 +59,7 @@ def test_bridge_model_name():
     assert "mml.3pl.bridge" in content
 
 
-@pytest.mark.odoo_integration
+@_odoo_integration
 class TestFreight3PLBridge(TransactionCase):
     """Odoo integration tests — require --test-enable. Skipped by plain pytest."""
 
