@@ -59,18 +59,18 @@ class TestEventSubscription(TransactionCase):
         self.env['mml.event.subscription'].register(
             event_type='test.dispatchable',
             handler_model='mml.event.subscription',
-            handler_method='_test_handler',
+            handler_method='_on_test_handler',
             module='_test_module',
         )
-        # Patch _test_handler onto the model for this test
+        # Patch _on_test_handler onto the model for this test
         called = []
         original = type(self.env['mml.event.subscription'])
-        original._test_handler = lambda self, event: called.append(event.event_type)
+        original._on_test_handler = lambda self, event: called.append(event.event_type)
         try:
             self.env['mml.event'].emit('test.dispatchable', quantity=1, billable_unit='test')
             self.assertIn('test.dispatchable', called)
         finally:
-            del original._test_handler
+            del original._on_test_handler
 
     def test_no_handler_for_unsubscribed_event(self):
         """emit() on an event with no subscribers does not raise."""
@@ -84,11 +84,11 @@ class TestEventSubscription(TransactionCase):
         self.env['mml.event.subscription'].register(
             event_type='test.failing_handler',
             handler_model='mml.event.subscription',
-            handler_method='_bad_handler',
+            handler_method='_on_bad_handler',
             module='_test_module',
         )
         original = type(self.env['mml.event.subscription'])
-        original._bad_handler = lambda self, event: (_ for _ in ()).throw(RuntimeError('boom'))
+        original._on_bad_handler = lambda self, event: (_ for _ in ()).throw(RuntimeError('boom'))
         try:
             # Must not raise — exception is caught and logged
             with self.assertLogs('odoo.addons.mml_base.models.mml_event_subscription', level='ERROR'):
@@ -98,4 +98,4 @@ class TestEventSubscription(TransactionCase):
             self.assertIsNotNone(event)
             self.assertTrue(event.id)
         finally:
-            del original._bad_handler
+            del original._on_bad_handler
