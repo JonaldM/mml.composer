@@ -35,6 +35,7 @@ Manual operator steps after install: see
     'data': [
         'security/petpro_storefront_groups.xml',
         'security/ir.model.access.csv',
+        'security/petpro_storefront_record_rules.xml',
         'data/petpro_storefront_user.xml',
     ],
     'installable': True,

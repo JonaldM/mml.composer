@@ -37,8 +37,15 @@ class Mml3plBridge(models.AbstractModel):
                     _logger.info(
                         '3PL bridge: queued inward order for PO id=%s, msg_id=%s', po.id, msg_id
                     )
-                    self.env['mml.event'].emit(
+                    # Idempotent emit: this billable meter event may fire more
+                    # than once if the freight.booking.confirmed event is
+                    # replayed (dispatch-failure retry, network re-delivery).
+                    # A stable (booking, PO) key prevents double-billing.
+                    self.env['mml.event'].emit_idempotent(
                         '3pl.inbound.queued',
+                        dedupe_key='mml_freight_3pl:freight.booking:%s:po:%s:queued' % (
+                            booking.id, po.id,
+                        ),
                         quantity=1,
                         billable_unit='3pl_receipt',
                         res_model='purchase.order',

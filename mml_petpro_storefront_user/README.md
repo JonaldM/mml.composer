@@ -49,6 +49,24 @@ the storefront container.
 
 Every other model is implicitly denied (Odoo's default).
 
+### Row-level scoping (record rules)
+
+ACLs are model-level only. `security/petpro_storefront_record_rules.xml`
+adds `ir.rule` record rules — scoped to the storefront group only — that
+restrict the per-customer models to rows the storefront user owns:
+
+| Model | Row rule (domain) |
+|---|---|
+| `sale.order` | `create_uid = storefront user` |
+| `sale.order.line` | `order_id.create_uid = storefront user` |
+| `res.partner` | own partner, or `create_uid`/`parent_id.create_uid = storefront user |
+| `account.move` | `partner_id.create_uid = storefront user` |
+| `account.move.line` | `move_id.partner_id.create_uid = storefront user` |
+| `payment.transaction` | `sale_order_ids.create_uid = storefront user` |
+
+Without these rules the storefront RPC user could read every customer's
+orders and invoices company-wide.
+
 ### Trade-offs
 
 - `res.partner` write+create — required for guest checkout to attach a delivery
