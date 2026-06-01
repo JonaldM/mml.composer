@@ -1,6 +1,6 @@
 {
     'name': 'MML Freight ↔ 3PL Bridge',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'summary': 'Connects mml_freight and stock_3pl_core when both are installed',
     'author': 'MML Consumer Products Ltd',
     'website': 'https://www.mmlconsumerproducts.co.nz',

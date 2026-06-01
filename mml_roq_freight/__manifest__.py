@@ -1,6 +1,6 @@
 {
     'name': 'MML ROQ ↔ Freight Bridge',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'summary': 'Connects mml_roq_forecast and mml_freight when both are installed',
     'author': 'MML Consumer Products Ltd',
     'website': 'https://www.mmlconsumerproducts.co.nz',
