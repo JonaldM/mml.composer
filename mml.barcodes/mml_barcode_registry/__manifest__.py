@@ -1,6 +1,6 @@
 {
     'name': 'MML Barcode Registry',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'category': 'Inventory',
     'summary': 'GTIN lifecycle management and one-click allocation',
     'author': 'MML Consumer Products Ltd',
