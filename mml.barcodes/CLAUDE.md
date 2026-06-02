@@ -90,7 +90,7 @@ CSV/XLSX import for migrating existing GS1 records. Accepts columns: `sequence` 
 ### Platform Integration
 
 - `hooks.py` registers capabilities (`barcode.allocate`, `barcode.generate_sequences`, `barcode.registry.read`) and the `BarcodeService` service locator key `'barcode'` with `mml_base` on install.
-- `BarcodeService` in `services/barcode_service.py` is the inter-module API surface — other modules call it via `env['mml.registry'].get('barcode')` without importing this module directly.
+- `BarcodeService` in `services/barcode_service.py` is the inter-module API surface — other modules call it via `env['mml.registry'].service('barcode')` (which instantiates it with the env via `__init__(self, env)`, matching every other platform service) without importing this module directly. Methods operate on `self.env`.
 
 ---
 
