@@ -15,7 +15,10 @@ Logic:
            mml.event.emit('3pl.inbound.queued', ...)    <- billable event
        else:
            log warning only, no event emitted
-  6. Any exception from the above block: log warning, return (no re-raise).
+  6. Any exception from the above block PROPAGATES to the caller. The bridge no
+     longer swallows handler failures: mml.event.subscription._dispatch_one wraps
+     each handler in its own savepoint and records failures in
+     mml.event.dispatch.failure. Swallowing here would hide them from that ledger.
 """
 import types
 import pytest
@@ -96,11 +99,27 @@ def _make_booking(res_id, po_ids, exists=True):
 
 
 class _FakeEventEmitter:
-    def __init__(self, log):
+    """Mimics mml.event: emit() always logs; emit_idempotent() dedupes on dedupe_key.
+
+    The shared ``_seen_keys`` set is what models the DB-backed idempotency
+    (partial UNIQUE on dedupe_key) so that a *replayed* event does not append
+    a second billing row.
+    """
+
+    def __init__(self, log, seen_keys):
         self._log = log
+        self._seen_keys = seen_keys
 
     def emit(self, event_type, **kwargs):
         self._log.append({'event_type': event_type, **kwargs})
+
+    def emit_idempotent(self, event_type, *, dedupe_key, **kwargs):
+        if dedupe_key in self._seen_keys:
+            return  # duplicate emit — no new billing row
+        self._seen_keys.add(dedupe_key)
+        self._log.append(
+            {'event_type': event_type, 'dedupe_key': dedupe_key, **kwargs}
+        )
 
 
 class _FakeRegistry:
@@ -112,16 +131,19 @@ class _FakeRegistry:
 
 
 class _FakeEnv:
-    def __init__(self, service_map, booking_map):
+    def __init__(self, service_map, booking_map, seen_keys=None):
         self._registry = _FakeRegistry(service_map)
         self._booking_map = booking_map
         self.emitted = []
+        # Shared across emitters built from this env, so repeated dispatch of
+        # the same event hits the same dedupe set (models the DB UNIQUE index).
+        self.seen_keys = seen_keys if seen_keys is not None else set()
 
     def __getitem__(self, model_name):
         if model_name == 'mml.registry':
             return self._registry
         if model_name == 'mml.event':
-            return _FakeEventEmitter(self.emitted)
+            return _FakeEventEmitter(self.emitted, self.seen_keys)
         if model_name == 'freight.booking':
             return _FakeBookingModel(self._booking_map)
         raise KeyError(model_name)
@@ -214,6 +236,11 @@ class TestOnFreightBookingConfirmed:
             assert emitted['billable_unit'] == '3pl_receipt'
             assert emitted['res_model'] == 'purchase.order'
             assert emitted['source_module'] == 'mml_freight_3pl'
+            # Billing event MUST carry a stable dedupe_key so a replayed
+            # freight.booking.confirmed does not double-bill the 3PL receipt.
+            assert emitted.get('dedupe_key'), (
+                "3pl.inbound.queued must be emitted idempotently with a dedupe_key"
+            )
 
     def test_no_op_when_res_id_is_zero(self):
         """Handler returns immediately when event.res_id is 0."""
@@ -299,8 +326,9 @@ class TestOnFreightBookingConfirmed:
         assert env.emitted[0]['event_type'] == '3pl.inbound.queued'
         assert env.emitted[0]['res_id'] == 7
 
-    def test_exception_from_queue_inward_order_does_not_propagate(self):
-        """Exception from queue_inward_order is caught; handler does not re-raise."""
+    def test_exception_from_queue_inward_order_propagates(self):
+        """Exception from queue_inward_order propagates so the mml_base dispatcher
+        can record it in mml.event.dispatch.failure (handler no longer swallows)."""
         svc = Mock3PLServiceRaises(exc=ConnectionError("3pl down"))
         po = _make_po(po_id=3)
         booking = _make_booking(res_id=10, po_ids=[po])
@@ -310,11 +338,12 @@ class TestOnFreightBookingConfirmed:
         )
         handler = _make_handler(env)
 
-        # Must not raise
-        handler._on_freight_booking_confirmed(_event(res_id=10))
+        with pytest.raises(ConnectionError):
+            handler._on_freight_booking_confirmed(_event(res_id=10))
 
-    def test_exception_suppresses_all_billing_events(self):
-        """When queue_inward_order raises, no billing event is emitted."""
+    def test_exception_emits_no_billing_event_before_raising(self):
+        """When queue_inward_order raises on the first PO, no billing event is
+        emitted before the exception propagates."""
         svc = Mock3PLServiceRaises()
         po = _make_po(po_id=3)
         booking = _make_booking(res_id=10, po_ids=[po])
@@ -324,7 +353,8 @@ class TestOnFreightBookingConfirmed:
         )
         handler = _make_handler(env)
 
-        handler._on_freight_booking_confirmed(_event(res_id=10))
+        with pytest.raises(Exception):
+            handler._on_freight_booking_confirmed(_event(res_id=10))
 
         assert env.emitted == []
 
@@ -358,3 +388,54 @@ class TestOnFreightBookingConfirmed:
         assert svc.queue_inward_order_calls == [1, 2]
         assert len(env.emitted) == 1
         assert env.emitted[0]['res_id'] == 1
+
+    def test_replayed_event_does_not_double_bill(self):
+        """Dispatching the SAME freight.booking.confirmed twice emits the
+        3pl.inbound.queued billing event only once per PO.
+
+        The platform supports re-emitting an event to replay handlers (see
+        mml_base dispatch-failure retry workflow). Because 3pl.inbound.queued
+        is a billable meter event, a replay must NOT create a second billing
+        row — it must be emitted via emit_idempotent() with a stable key.
+        """
+        svc = Mock3PLService(msg_id=500)
+        po1 = _make_po(po_id=1)
+        po2 = _make_po(po_id=2)
+        booking = _make_booking(res_id=10, po_ids=[po1, po2])
+        env = _make_env(
+            service_map={'3pl': svc},
+            booking_map={10: booking},
+        )
+        handler = _make_handler(env)
+
+        # First dispatch — two PO billing events.
+        handler._on_freight_booking_confirmed(_event(res_id=10))
+        # Replay the identical event.
+        handler._on_freight_booking_confirmed(_event(res_id=10))
+
+        # queue_inward_order may run again (it is the service's job to be
+        # idempotent on its own side), but billing must not double-count.
+        assert len(env.emitted) == 2, (
+            f"expected exactly 2 billing events across two dispatches of the "
+            f"same booking (one per PO), got {len(env.emitted)}"
+        )
+        keys = {e['dedupe_key'] for e in env.emitted}
+        assert len(keys) == 2, "each PO must have its own distinct dedupe_key"
+
+    def test_dedupe_key_is_stable_and_po_scoped(self):
+        """The dedupe_key encodes booking + PO so distinct POs do not collide
+        and the same (booking, PO) pair always yields the same key."""
+        svc = Mock3PLService(msg_id=500)
+        po = _make_po(po_id=42)
+        booking = _make_booking(res_id=99, po_ids=[po])
+        env = _make_env(service_map={'3pl': svc}, booking_map={99: booking})
+        handler = _make_handler(env)
+
+        handler._on_freight_booking_confirmed(_event(res_id=99))
+
+        assert len(env.emitted) == 1
+        key = env.emitted[0]['dedupe_key']
+        # Stable, namespaced, and references both the booking and the PO.
+        assert '99' in key and '42' in key, (
+            f"dedupe_key {key!r} must reference both booking (99) and PO (42)"
+        )

@@ -23,17 +23,27 @@
         design — fail closed.
 -->
 <odoo>
+    <!--
+        share=True (portal/external user), NOT an internal base.group_user.
+        base.group_user is a FULL internal user: it carries a broad implied-read
+        surface (res.users enumeration, most master data, internal-only models)
+        that contradicts this module's least-privilege purpose. The storefront's
+        actual needs are covered explicitly: the transactional models in
+        security/ir.model.access.csv (row-scoped by petpro_storefront_record_rules.xml)
+        plus the master-data read ACLs added there (countries, currency, UoM, taxes).
+        If a future storefront flow genuinely needs an internal-only model, add a
+        narrow explicit ACL for THAT model — do NOT re-add base.group_user.
+    -->
     <record id="user_petpro_storefront" model="res.users" forcecreate="1">
         <field name="name">MML PetPro Storefront</field>
         <field name="login">petpro_storefront@petpro.co.nz</field>
         <field name="email">petpro_storefront@petpro.co.nz</field>
         <field name="active">True</field>
-        <field name="share">False</field>
+        <field name="share">True</field>
         <field name="notification_type">email</field>
         <field name="signature">PetPro Storefront RPC user — system generated. Do not reply.</field>
-        <field name="groups_id" eval="[
+        <field name="group_ids" eval="[
             (6, 0, [
-                ref('base.group_user'),
                 ref('mml_petpro_storefront_user.group_petpro_storefront'),
             ])
         ]"/>

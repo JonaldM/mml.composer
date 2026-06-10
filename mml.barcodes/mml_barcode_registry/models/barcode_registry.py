@@ -81,11 +81,14 @@ class BarcodeRegistry(models.Model):
         default=lambda self: self.env.company,
     )
 
-    _gtin13_uniq = models.Constraint('UNIQUE(gtin_13)', 'GTIN-13 must be unique.')
-    _gtin14_uniq = models.Constraint('UNIQUE(gtin_14)', 'GTIN-14 must be unique.')
-    _sequence_company_uniq = models.Constraint(
-        'UNIQUE(sequence, company_id)', 'Sequence must be unique per company.',
-    )
+    # Use _sql_constraints (supported across Odoo 16–19) rather than models.Constraint,
+    # which changed internal representation in Odoo 19 and can trigger
+    # TypeError: issubclass() arg 1 must be a class during metaclass processing.
+    _sql_constraints = [
+        ('gtin13_uniq', 'UNIQUE(gtin_13)', 'GTIN-13 must be unique.'),
+        ('gtin14_uniq', 'UNIQUE(gtin_14)', 'GTIN-14 must be unique.'),
+        ('sequence_company_uniq', 'UNIQUE(sequence, company_id)', 'Sequence must be unique per company.'),
+    ]
 
     @api.depends('sequence')
     def _compute_gtin(self):
@@ -148,10 +151,22 @@ class BarcodeRegistry(models.Model):
             rec.write({'status': 'retired'})
 
     def action_return_to_pool(self):
-        """Move retired registry record back to unallocated. Requires 48-month cool-down."""
+        """Move retired registry record back to unallocated. Requires the company
+        to have opted in to GTIN reuse, plus the 48-month cool-down."""
         today = fields.Date.today()
         for rec in self:
             rec._validate_transition('unallocated')
+            # GS1 policy since 2019 is not to reuse GTINs at all. Returning a slot
+            # to the pool only happens if the company explicitly opts in.
+            if not rec.company_id.allow_gtin_reuse:
+                raise UserError(
+                    f"GTIN {rec.gtin_13} cannot be returned to the pool: GTIN reuse "
+                    f"is disabled for this company (GS1 best practice is to never "
+                    f"reuse a GTIN). A registry administrator can enable 'Allow GTIN "
+                    f"reuse' on the company if reuse is genuinely required.\n\n"
+                    f"To obtain new GTINs, apply for an additional prefix block at "
+                    f"https://www.gs1nz.org/"
+                )
             if rec.reuse_eligible_date and rec.reuse_eligible_date > today:
                 delta = relativedelta(rec.reuse_eligible_date, today)
                 months_remaining = delta.years * 12 + delta.months + (1 if delta.days > 0 else 0)

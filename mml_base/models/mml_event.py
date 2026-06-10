@@ -1,4 +1,11 @@
 import json
+
+try:
+    from psycopg2.errors import UniqueViolation
+except ImportError:  # pure-python test harness: psycopg2 absent or stubbed flat
+    class UniqueViolation(Exception):
+        """Stand-in when psycopg2 isn't importable (stubbed test env)."""
+
 from odoo import api, fields, models
 
 
@@ -28,11 +35,32 @@ class MmlEvent(models.Model):
         help=(
             'Optional idempotency key. If provided to emit_idempotent(), '
             'duplicate emits with the same dedupe_key are no-ops returning '
-            'the original event. Indexed; partial UNIQUE constraint where '
-            'dedupe_key IS NOT NULL is added by the 19.0.1.1.0 '
-            'post-migration script.'
+            'the original event. A partial UNIQUE index where dedupe_key '
+            'IS NOT NULL enforces this at the DB level; it is created by '
+            'init() (so it exists on a fresh install) and mirrored by the '
+            '19.0.1.1.0 post-migration (for already-upgraded DBs).'
         ),
     )
+
+    def init(self):
+        """Create the partial UNIQUE index that makes emit_idempotent safe.
+
+        Defined here — not only in a migration — because Odoo never runs
+        ``migrations/`` scripts on a *fresh* install (``-i``), which is exactly
+        MML's go-live path (installing into the migrated 15->19 DB). Without
+        this, ``index=True`` on ``dedupe_key`` yields only a plain non-unique
+        index and concurrent ``emit_idempotent`` calls under multiple workers
+        could both insert — duplicate billable events and double dispatch.
+
+        ``CREATE ... IF NOT EXISTS`` with the same name the post-migration uses
+        keeps this a no-op on DBs that already have the index. NULL dedupe_key
+        rows (plain ``emit()``) are exempt from the partial index.
+        """
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS mml_event_dedupe_key_uniq
+            ON mml_event (dedupe_key)
+            WHERE dedupe_key IS NOT NULL
+        """)
 
     @api.model
     def emit(
@@ -46,14 +74,21 @@ class MmlEvent(models.Model):
         payload: dict | None = None,
         source_module: str = '',
     ) -> 'MmlEvent':
-        """Create and persist a billable event. Call from any mml_* module."""
-        event = self.create({
+        """Create and persist a billable event. Call from any mml_* module.
+
+        The ledger is platform telemetry written on behalf of whatever business
+        action fired it, so the create is done with ``sudo()``: the ACL grants
+        normal users only read on ``mml.event`` (create is system-only), and a
+        plain create would raise AccessError for an ordinary internal user
+        clicking e.g. "Confirm Booking". Values are all server-built here.
+        """
+        event = self.sudo().create({
             'event_type': event_type,
             'quantity': quantity,
             'billable_unit': billable_unit,
             'res_model': res_model,
             'res_id': res_id,
-            'payload_json': json.dumps(payload or {}),
+            'payload_json': json.dumps(payload or {}, default=str),
             'source_module': source_module,
             'instance_ref': self.env['ir.config_parameter'].sudo().get_param('mml.instance_ref', default=''),
         })
@@ -98,18 +133,29 @@ class MmlEvent(models.Model):
         )
         if existing:
             return existing
-        event = self.create({
-            'event_type': event_type,
-            'quantity': quantity,
-            'billable_unit': billable_unit,
-            'res_model': res_model,
-            'res_id': res_id,
-            'payload_json': json.dumps(payload or {}),
-            'source_module': source_module,
-            'dedupe_key': dedupe_key,
-            'instance_ref': self.env['ir.config_parameter'].sudo().get_param(
-                'mml.instance_ref', default=''
-            ),
-        })
+        try:
+            with self.env.cr.savepoint():
+                event = self.sudo().create({
+                    'event_type': event_type,
+                    'quantity': quantity,
+                    'billable_unit': billable_unit,
+                    'res_model': res_model,
+                    'res_id': res_id,
+                    'payload_json': json.dumps(payload or {}, default=str),
+                    'source_module': source_module,
+                    'dedupe_key': dedupe_key,
+                    'instance_ref': self.env['ir.config_parameter'].sudo().get_param(
+                        'mml.instance_ref', default=''
+                    ),
+                })
+        except UniqueViolation:
+            # A concurrent worker emitted the same dedupe_key first; the partial
+            # UNIQUE index rejected our insert. Return the winner rather than
+            # letting the IntegrityError abort the caller's transaction (the
+            # whole point of idempotency is that the second caller succeeds).
+            # The savepoint has rolled back our failed insert.
+            return self.sudo().search(
+                [('dedupe_key', '=', dedupe_key)], limit=1
+            )
         self.env['mml.event.subscription'].dispatch(event)
         return event

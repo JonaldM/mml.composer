@@ -92,15 +92,20 @@ class TestOneClickAllocation(TransactionCase):
         self.assertTrue(self.product.barcode)
         self.assertEqual(len(self.product.barcode), 13)
 
-    def test_allocate_creates_packaging(self):
+    def test_allocate_records_gtin14_on_registry(self):
+        # product.packaging was removed in Odoo 19 (merged into UoM), so the
+        # allocation no longer creates a packaging record. The GTIN-14 outer-carton
+        # code lives on the registry record reached via the active allocation.
         self.product.action_allocate_barcode()
-        packaging = self.env['product.packaging'].search([
+        alloc = self.env['mml.barcode.allocation'].search([
             ('product_id', '=', self.product.id),
-            ('name', '=', 'Outer Carton'),
-        ])
-        self.assertTrue(packaging)
-        self.assertEqual(len(packaging.barcode), 14)
-        self.assertEqual(packaging.qty, 1.0)
+            ('status', '=', 'active'),
+        ], limit=1)
+        self.assertTrue(alloc)
+        gtin_14 = alloc.registry_id.gtin_14
+        self.assertEqual(len(gtin_14), 14)
+        # GTIN-14 outer-carton indicator digit is '1'.
+        self.assertTrue(gtin_14.startswith('1'))
 
     def test_allocate_creates_active_allocation(self):
         self.product.action_allocate_barcode()
@@ -204,7 +209,7 @@ class TestUniqueActiveAllocation(TransactionCase):
         })
 
         registry2 = self._get_unallocated()
-        with self.assertRaises((ValidationError, UserError)):
+        with self.assertRaises(UserError):
             self.env['mml.barcode.allocation'].create({
                 'registry_id': registry2.id,
                 'product_id': self.product.id,

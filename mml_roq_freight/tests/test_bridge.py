@@ -2,7 +2,12 @@
 Tests for mml_roq_freight bridge module.
 Structural tests are pure-Python; Odoo integration tests require --test-enable.
 """
-import pytest
+try:
+    import pytest as _pytest
+    _odoo_integration = _pytest.mark.odoo_integration
+except ImportError:
+    def _odoo_integration(cls):
+        return cls
 
 try:
     from odoo.tests.common import TransactionCase
@@ -56,7 +61,7 @@ def test_hooks_have_post_init_and_uninstall():
     assert 'def uninstall_hook' in content
 
 
-@pytest.mark.odoo_integration
+@_odoo_integration
 class TestROQFreightBridge(TransactionCase):
     """Odoo integration tests — require --test-enable. Skipped by plain pytest."""
 

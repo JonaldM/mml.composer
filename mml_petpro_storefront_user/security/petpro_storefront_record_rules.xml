@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Record rules (ir.rule) for the PetPro storefront RPC user.
+
+    The ACL (ir.model.access.csv) grants the storefront group access to a set
+    of transactional models. ACLs are MODEL-level only: on their own they let
+    the storefront user read EVERY customer's orders, partners, invoices and
+    payment transactions company-wide. These record rules add the missing
+    ROW-level boundary so the least-privilege user can only see the data it
+    created (its own carts/orders/guest contacts) and the financial documents
+    derived from them.
+
+    Boundary: ownership via create_uid (the storefront user is the creator of
+    the rows it touches) plus the storefront user's own partner. This cannot
+    hide a record the storefront legitimately created and reads back, while
+    blocking access to records created by other users (admins, EDI, other
+    customers).
+
+    All rules are scoped to group_petpro_storefront ONLY — they never apply to
+    admins or other users (global=False, which is the default when 'groups' is
+    set). They apply to all CRUD operations (perm_read/write/create/unlink all
+    default True) so write/create grants are row-bounded too.
+
+    See the trade-offs section of
+    docs/operations/2026-04-27-petpro-storefront-user-runbook.md.
+-->
+<odoo noupdate="0">
+
+    <!-- sale.order: only orders the storefront created. -->
+    <record id="rule_petpro_sale_order_own" model="ir.rule">
+        <field name="name">PetPro storefront: own sale orders only</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="groups" eval="[(4, ref('mml_petpro_storefront_user.group_petpro_storefront'))]"/>
+        <field name="domain_force">[('create_uid', '=', user.id)]</field>
+    </record>
+
+    <!-- sale.order.line: lines of the storefront's own orders. -->
+    <record id="rule_petpro_sale_order_line_own" model="ir.rule">
+        <field name="name">PetPro storefront: own sale order lines only</field>
+        <field name="model_id" ref="sale.model_sale_order_line"/>
+        <field name="groups" eval="[(4, ref('mml_petpro_storefront_user.group_petpro_storefront'))]"/>
+        <field name="domain_force">[('order_id.create_uid', '=', user.id)]</field>
+    </record>
+
+    <!--
+        res.partner: the storefront's own user partner, the guest contacts it
+        created, and child contacts (delivery addresses) it created under the
+        shared guest parent. Blocks reading/updating arbitrary partners.
+    -->
+    <record id="rule_petpro_res_partner_own" model="ir.rule">
+        <field name="name">PetPro storefront: own + created partners only</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="groups" eval="[(4, ref('mml_petpro_storefront_user.group_petpro_storefront'))]"/>
+        <field name="domain_force">['|', '|', ('create_uid', '=', user.id), ('id', '=', user.partner_id.id), ('parent_id.create_uid', '=', user.id)]</field>
+    </record>
+
+    <!--
+        account.move: invoices whose partner was created by the storefront
+        (i.e. invoices raised against the storefront's own guest customers).
+        Read-only per the ACL; this rule prevents reading every company invoice.
+    -->
+    <record id="rule_petpro_account_move_own" model="ir.rule">
+        <field name="name">PetPro storefront: own customers' invoices only</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="groups" eval="[(4, ref('mml_petpro_storefront_user.group_petpro_storefront'))]"/>
+        <field name="domain_force">[('partner_id.create_uid', '=', user.id)]</field>
+    </record>
+
+    <!-- account.move.line: lines of the above invoices. -->
+    <record id="rule_petpro_account_move_line_own" model="ir.rule">
+        <field name="name">PetPro storefront: own customers' invoice lines only</field>
+        <field name="model_id" ref="account.model_account_move_line"/>
+        <field name="groups" eval="[(4, ref('mml_petpro_storefront_user.group_petpro_storefront'))]"/>
+        <field name="domain_force">[('move_id.partner_id.create_uid', '=', user.id)]</field>
+    </record>
+
+    <!--
+        payment.transaction: transactions linked to the storefront's own sale
+        orders. Read-only per the ACL; prevents reading every company payment.
+    -->
+    <record id="rule_petpro_payment_transaction_own" model="ir.rule">
+        <field name="name">PetPro storefront: own orders' payment transactions only</field>
+        <field name="model_id" ref="payment.model_payment_transaction"/>
+        <field name="groups" eval="[(4, ref('mml_petpro_storefront_user.group_petpro_storefront'))]"/>
+        <field name="domain_force">[('sale_order_ids.create_uid', '=', user.id)]</field>
+    </record>
+
+</odoo>

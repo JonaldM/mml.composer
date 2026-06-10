@@ -1,6 +1,6 @@
 {
     'name': 'MML Barcode Registry',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'category': 'Inventory',
     'summary': 'GTIN lifecycle management and one-click allocation',
     'author': 'MML Consumer Products Ltd',
@@ -20,6 +20,7 @@
         'views/barcode_allocation_views.xml',
         'views/mml_brand_views.xml',
         'views/barcode_prefix_views.xml',
+        'views/res_company_views.xml',
         'views/product_views.xml',
         'views/dashboard_views.xml',
         'views/menu.xml',

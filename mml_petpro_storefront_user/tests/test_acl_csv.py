@@ -85,9 +85,74 @@ def test_user_xml_is_well_formed_and_has_no_password():
     # Hard requirement from the sprint task — must be set out-of-band.
     assert "password" not in field_names, "res.users template MUST NOT hardcode a password"
     # And the public template must wire group membership.
-    assert "groups_id" in field_names
+    assert "group_ids" in field_names
     # Login should be set so the operator knows what email to use in the UI.
     assert "login" in field_names
+
+
+def _user_field_text(field_name):
+    """Return the text of a <field name=...> on the storefront res.users record."""
+    tree = ET.parse(_USER_XML)
+    root = tree.getroot()
+    user = next(
+        r for r in root.findall("record") if r.attrib.get("model") == "res.users"
+    )
+    for f in user.findall("field"):
+        if f.attrib.get("name") == field_name:
+            return f.text or "", f.attrib.get("eval", "")
+    return None
+
+
+def test_storefront_user_is_a_share_user_not_internal():
+    """The storefront RPC user must be a least-privilege portal/share user.
+
+    base.group_user (a full internal user) carries a broad implied-read surface
+    (res.users enumeration, most master data) that defeats the module's purpose.
+    The user must be share=True and must NOT be a member of base.group_user.
+    """
+    share = _user_field_text("share")
+    assert share is not None, "storefront user must explicitly set share"
+    share_text = (share[0] or "").strip().lower()
+    assert share_text == "true", (
+        f"storefront user must be share=True (portal/external), got share={share[0]!r}"
+    )
+
+    groups = _user_field_text("group_ids")
+    assert groups is not None, "storefront user must declare group_ids (renamed from groups_id in Odoo 19)"
+    groups_eval = groups[1]
+    assert "base.group_user" not in groups_eval, (
+        "storefront user MUST NOT be granted base.group_user (full internal user); "
+        "it must be a least-privilege share user with explicit ACLs only"
+    )
+    assert _PETPRO_GROUP_REF in groups_eval, (
+        "storefront user must be a member of the petpro storefront group"
+    )
+
+
+def test_master_data_reads_are_present_and_read_only():
+    """Dropping base.group_user removes implied master-data reads; the ACL must
+    grant them back explicitly (countries, currency, UoM, taxes) and read-only."""
+    rows = _read_csv_rows()[1:]
+    by_model = {row[2]: row for row in rows}
+    required_read_only = {
+        "base.model_res_country",
+        "base.model_res_country_state",
+        "base.model_res_currency",
+        "uom.model_uom_uom",
+        "uom.model_uom_category",
+        "account.model_account_tax",
+    }
+    missing = required_read_only - set(by_model)
+    assert not missing, (
+        f"master-data models needed by the catalogue/checkout flows are not "
+        f"granted now that base.group_user is dropped: {sorted(missing)}"
+    )
+    for model_ref in required_read_only:
+        perm_read, perm_write, perm_create, perm_unlink = by_model[model_ref][4:8]
+        assert perm_read == "1", f"{model_ref} must be readable"
+        assert (perm_write, perm_create, perm_unlink) == ("0", "0", "0"), (
+            f"{model_ref} master-data access must be read-only"
+        )
 
 
 def test_acl_csv_header_is_canonical():

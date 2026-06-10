@@ -1,3 +1,4 @@
+from . import res_company
 from . import mml_brand
 from . import barcode_prefix
 from . import barcode_registry

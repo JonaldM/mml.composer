@@ -1,18 +1,27 @@
 # mml.barcodes/mml_barcode_registry/services/barcode_service.py
 """
-BarcodeService — registered with mml.registry under key 'barcode'.
+BarcodeService - registered with mml.registry under key 'barcode'.
 Allows other modules to call barcode operations without a hard import.
+
+Retrieved via ``env['mml.registry'].service('barcode')``, which instantiates
+the class with the calling environment - matching the constructor contract of
+every other platform service (EDIService, TPLService, ROQService,
+FreightService): ``__init__(self, env)``. Methods operate on ``self.env``.
 """
 
 
 class BarcodeService:
     """
     Thin adapter exposing barcode allocation operations via the service locator.
-    All methods take `env` as the first argument (no self.env).
+
+    Instantiated by ``mml.registry.service('barcode')`` with the active
+    environment; all methods operate on ``self.env``.
     """
 
-    @staticmethod
-    def allocate_next(env, product_id: int) -> dict:
+    def __init__(self, env):
+        self.env = env
+
+    def allocate_next(self, product_id: int) -> dict:
         """
         Allocate the next available GTIN to the given product.
 
@@ -21,9 +30,9 @@ class BarcodeService:
         Raises:
             UserError if no GTINs are available or product already has one.
         """
-        product = env['product.product'].browse(product_id)
+        product = self.env['product.product'].browse(product_id)
         product.action_allocate_barcode()
-        allocation = env['mml.barcode.allocation'].search([
+        allocation = self.env['mml.barcode.allocation'].search([
             ('product_id', '=', product_id),
             ('status', '=', 'active'),
         ], limit=1, order='id desc')
@@ -40,12 +49,11 @@ class BarcodeService:
             'allocation_id': allocation.id,
         }
 
-    @staticmethod
-    def get_allocation(env, product_id: int) -> dict | None:
+    def get_allocation(self, product_id: int) -> dict | None:
         """
         Return the active allocation for a product, or None if none exists.
         """
-        allocation = env['mml.barcode.allocation'].search([
+        allocation = self.env['mml.barcode.allocation'].search([
             ('product_id', '=', product_id),
             ('status', '=', 'active'),
         ], limit=1)

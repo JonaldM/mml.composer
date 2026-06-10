@@ -61,14 +61,8 @@ class MmlRoqFreightBridge(models.AbstractModel):
         """
         if not event.res_id:
             return
-        try:
-            svc = self.env['mml.registry'].service('roq')
-            svc.on_freight_booking_confirmed(event)
-        except Exception as exc:
-            _logger.warning(
-                "mml_roq_freight: _on_freight_booking_confirmed failed for event %s: %s",
-                event.id if hasattr(event, 'id') else '?',
-                exc,
-                exc_info=True,
-            )
-            return
+        # No broad try/except: mml.event.subscription._dispatch_one runs this handler
+        # inside its own savepoint and records any failure in mml.event.dispatch.failure.
+        # Swallowing the exception here would hide the failure from that ledger.
+        svc = self.env['mml.registry'].service('roq')
+        svc.on_freight_booking_confirmed(event)

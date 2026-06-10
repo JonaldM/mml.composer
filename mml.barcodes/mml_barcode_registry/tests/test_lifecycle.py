@@ -105,6 +105,8 @@ class TestAllocationLifecycle(TransactionCase):
             alloc.action_discontinue()
 
     def test_dormant_to_discontinued_allowed_after_eligible(self):
+        # Opt in to GTIN reuse so the slot returns to the pool after the cool-down.
+        self.env.company.allow_gtin_reuse = True
         registry = self._get_unallocated()
         registry.write({'status': 'in_use'})
         past_date = date.today() - relativedelta(days=1)
@@ -121,6 +123,27 @@ class TestAllocationLifecycle(TransactionCase):
         alloc.action_discontinue()
         self.assertEqual(alloc.status, 'discontinued')
         self.assertEqual(registry.status, 'unallocated')
+
+    def test_discontinue_retires_slot_when_reuse_disabled(self):
+        """Default posture (allow_gtin_reuse=False): discontinuing retires the
+        registry slot rather than returning the GTIN to the pool."""
+        self.env.company.allow_gtin_reuse = False
+        registry = self._get_unallocated()
+        registry.write({'status': 'in_use'})
+        alloc = self.env['mml.barcode.allocation'].create({
+            'registry_id': registry.id,
+            'product_id': self.product.id,
+            'status': 'dormant',
+            'allocation_date': date.today() - relativedelta(months=50),
+            'discontinue_date': date.today() - relativedelta(months=48, days=1),
+            'reuse_eligible_date': date.today() - relativedelta(days=1),
+            'company_id': self.env.company.id,
+        })
+        registry.write({'current_allocation_id': alloc.id})
+        alloc.action_discontinue()
+        self.assertEqual(alloc.status, 'discontinued')
+        self.assertEqual(registry.status, 'retired')
+        self.assertFalse(registry.current_allocation_id)
 
     def test_invalid_transition_raises(self):
         registry = self._get_unallocated()
@@ -142,6 +165,9 @@ class TestAllocationLifecycle(TransactionCase):
             registry.action_retire()  # unallocated → retired is invalid
 
     def test_registry_return_to_pool_blocked_before_eligible(self):
+        # Opt in to reuse so this exercises the cool-down block specifically
+        # (rather than the reuse-disabled block).
+        self.env.company.allow_gtin_reuse = True
         registry = self._get_unallocated()
         registry.write({'status': 'retired'})
         future_date = date.today() + relativedelta(months=48)
@@ -159,7 +185,9 @@ class TestAllocationLifecycle(TransactionCase):
             registry.action_return_to_pool()
 
     def test_full_reuse_cycle(self):
-        """Full cycle: unallocated → in_use → retired → unallocated after 48mo."""
+        """Full cycle: unallocated → in_use → retired → unallocated after 48mo.
+        Requires the company to opt in to GTIN reuse."""
+        self.env.company.allow_gtin_reuse = True
         registry = self._get_unallocated()
         registry.write({'status': 'in_use'})
         past_date = date.today() - relativedelta(days=1)
@@ -184,7 +212,7 @@ class TestAllocationLifecycle(TransactionCase):
     def test_blank_sequence_rejected(self):
         """Empty sequence must not be saveable."""
         from odoo.exceptions import ValidationError
-        with self.assertRaises((ValidationError, Exception)):
+        with self.assertRaises(Exception):
             self.env['mml.barcode.registry'].create({
                 'sequence': '',
                 'prefix_id': self.prefix.id,
@@ -195,7 +223,7 @@ class TestAllocationLifecycle(TransactionCase):
     def test_non_numeric_sequence_rejected(self):
         """Non-digit sequence must be rejected."""
         from odoo.exceptions import ValidationError
-        with self.assertRaises((ValidationError, Exception)):
+        with self.assertRaises(Exception):
             self.env['mml.barcode.registry'].create({
                 'sequence': 'ABCD12345678',
                 'prefix_id': self.prefix.id,
@@ -206,7 +234,7 @@ class TestAllocationLifecycle(TransactionCase):
     def test_wrong_length_sequence_rejected(self):
         """Sequence must be exactly 12 digits."""
         from odoo.exceptions import ValidationError
-        with self.assertRaises((ValidationError, Exception)):
+        with self.assertRaises(Exception):
             self.env['mml.barcode.registry'].create({
                 'sequence': '12345',
                 'prefix_id': self.prefix.id,
@@ -216,13 +244,17 @@ class TestAllocationLifecycle(TransactionCase):
 
     # ── GS1 cool-down date ────────────────────────────────────────────────────
 
-    def test_reuse_eligible_date_counts_from_allocation_date(self):
+    def test_reuse_eligible_date_counts_from_discontinue_date(self):
         """
-        GS1 best practice: 48-month cool-down starts from first allocation date,
-        not from discontinuation date.
+        The 48-month cool-down must start from the discontinue / last-supply date
+        (set to today when the allocation goes dormant), NOT from allocation_date.
+        Counting from allocation_date made a SKU allocated years ago instantly
+        reuse-eligible the moment it was archived, while it could still be on
+        retailer shelves.
         """
+        # allocation_date is years in the past; cool-down must ignore it.
         allocation_date = date(2020, 1, 1)
-        expected_eligible = allocation_date + relativedelta(months=48)
+        expected_eligible = date.today() + relativedelta(months=48)
 
         registry = self._get_unallocated()
         alloc = self.env['mml.barcode.allocation'].create({
@@ -238,7 +270,7 @@ class TestAllocationLifecycle(TransactionCase):
             expected_eligible,
             msg=(
                 f"Expected reuse_eligible_date to be {expected_eligible} "
-                f"(allocation_date + 48 months), got {alloc.reuse_eligible_date}. "
-                "Cool-down must be counted from allocation_date, not discontinuation date."
+                f"(discontinue date + 48 months), got {alloc.reuse_eligible_date}. "
+                "Cool-down must be counted from the discontinue date, not allocation_date."
             ),
         )

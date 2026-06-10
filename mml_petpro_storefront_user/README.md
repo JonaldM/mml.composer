@@ -46,8 +46,43 @@ the storefront container.
 | `account.move.line` | yes | no | no | no |
 | `delivery.carrier` | yes | no | no | no |
 | `payment.transaction` | yes | no | no | no |
+| `res.country` | yes | no | no | no |
+| `res.country.state` | yes | no | no | no |
+| `res.currency` | yes | no | no | no |
+| `uom.uom` | yes | no | no | no |
+| `uom.category` | yes | no | no | no |
+| `account.tax` | yes | no | no | no |
 
 Every other model is implicitly denied (Odoo's default).
+
+### User type: portal/share, not internal
+
+The RPC user is a **share user** (`share=True`) and is **not** a member of
+`base.group_user`. An internal `base.group_user` carries a broad implied-read
+surface (e.g. `res.users` enumeration and most master data), which defeats the
+least-privilege purpose of this module. Instead the master-data reads the
+catalogue and guest-checkout flows actually need — countries, country states,
+currency, units of measure, and taxes — are granted explicitly read-only above.
+If a future storefront flow needs an internal-only model, add a narrow explicit
+ACL for that model rather than re-adding `base.group_user`.
+
+### Row-level scoping (record rules)
+
+ACLs are model-level only. `security/petpro_storefront_record_rules.xml`
+adds `ir.rule` record rules — scoped to the storefront group only — that
+restrict the per-customer models to rows the storefront user owns:
+
+| Model | Row rule (domain) |
+|---|---|
+| `sale.order` | `create_uid = storefront user` |
+| `sale.order.line` | `order_id.create_uid = storefront user` |
+| `res.partner` | own partner, or `create_uid`/`parent_id.create_uid = storefront user |
+| `account.move` | `partner_id.create_uid = storefront user` |
+| `account.move.line` | `move_id.partner_id.create_uid = storefront user` |
+| `payment.transaction` | `sale_order_ids.create_uid = storefront user` |
+
+Without these rules the storefront RPC user could read every customer's
+orders and invoices company-wide.
 
 ### Trade-offs
 

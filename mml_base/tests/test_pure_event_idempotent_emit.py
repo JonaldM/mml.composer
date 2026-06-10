@@ -58,8 +58,9 @@ def mml_event_cls():
 def test_dedupe_key_field_declared_as_char_with_index(mml_event_cls):
     """dedupe_key is a Char field with index=True so lookups are fast.
 
-    The partial UNIQUE index is added in the post-migration script
-    (mml_base/migrations/19.0.1.1.0/post-migration.py); the field-level
+    The partial UNIQUE index is created by MmlEvent.init() (so it exists on
+    FRESH installs — Odoo never runs migrations/ on -i) and mirrored by the
+    19.0.1.1.0 post-migration for already-upgraded DBs; the field-level
     index=True keeps the BTREE in place for queries even without the
     UNIQUE constraint enforced for NULL rows.
     """
@@ -128,9 +129,14 @@ def test_emit_idempotent_returns_existing_event_on_duplicate_key(mml_event_cls):
       - self.sudo() -> self
       - self.search([('dedupe_key', '=', K)], limit=1) -> existing or []
       - self.create({...}) -> records the call and returns a fake event
+      - self.env.cr.savepoint() -> no-op context manager (the real method
+        wraps the create in a savepoint to catch a concurrent-duplicate
+        UniqueViolation and return the winner)
       - self.env['mml.event.subscription'].dispatch(event) -> records the call
       - self.env['ir.config_parameter'].sudo().get_param(...) -> ''
     """
+    import contextlib
+
     instance = mml_event_cls()
 
     # First emit: search returns empty -> create runs.
@@ -156,7 +162,14 @@ def test_emit_idempotent_returns_existing_event_on_duplicate_key(mml_event_cls):
         def get_param(self, key, default=''):
             return default
 
+    class _FakeCr:
+        @contextlib.contextmanager
+        def savepoint(self):
+            yield
+
     class _FakeEnv:
+        cr = _FakeCr()
+
         def __getitem__(self, model_name):
             if model_name == 'mml.event.subscription':
                 return _FakeSubscription()
@@ -250,7 +263,16 @@ def test_emit_idempotent_distinct_keys_create_distinct_events(mml_event_cls):
         def get_param(self, key, default=''):
             return default
 
+    import contextlib
+
+    class _FakeCr:
+        @contextlib.contextmanager
+        def savepoint(self):
+            yield
+
     class _FakeEnv:
+        cr = _FakeCr()
+
         def __getitem__(self, model_name):
             if model_name == 'mml.event.subscription':
                 return _FakeSubscription()

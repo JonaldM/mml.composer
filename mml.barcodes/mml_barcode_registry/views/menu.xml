@@ -2,7 +2,7 @@
 <odoo>
     <!-- Root menu — standalone app tile -->
     <menuitem id="menu_barcode_root"
-              name="Barcodes"
+              name="MML Barcodes"
               web_icon="mml_barcode_registry,static/description/icon.png"
               sequence="80"/>
 
