@@ -15,7 +15,7 @@ Odoo 19 module that replaces MML's Excel GTIN spreadsheet with a full barcode li
 | **GTIN pool** | `mml.barcode.registry` — permanent record per GTIN-13; never deleted |
 | **Allocation history** | `mml.barcode.allocation` — one row per product/GTIN assignment; accumulates across reuse cycles |
 | **One-click allocation** | "Allocate Barcode" button on product form; atomically claims next available GTIN with `FOR UPDATE SKIP LOCKED` |
-| **GS1 48-month rule** | Discontinued GTINs cannot be reused until 48 months after discontinuation; enforced at the model layer |
+| **GTIN reuse policy** | **Default: GTINs are never reused** (current GS1 policy since 2019) — discontinuing a SKU retires its slot permanently. A company-level opt-in (`allow_gtin_reuse`) re-enables the legacy 48-month cool-down, measured from the **discontinue date** (not allocation date) |
 | **Archive hook** | Archiving a product automatically sets its allocation dormant; un-archiving reactivates it |
 | **Import wizard** | Upload existing XLSX or CSV spreadsheet to seed the registry from your historical data |
 | **Billing events** | Emits `barcode.gtin.allocated` event to `mml.event` on each allocation for usage metering |
@@ -25,18 +25,23 @@ Odoo 19 module that replaces MML's Excel GTIN spreadsheet with a full barcode li
 ## GS1 Lifecycle
 
 ```
-Registry:   unallocated ──► in_use ──► retired ──► unallocated (after 48 months)
+Registry:   unallocated ──► in_use ──► retired                      (default: terminal)
+                                          └──► unallocated          (ONLY if the company
+                                               (48 months after      opts in to
+                                                discontinue date)    allow_gtin_reuse)
 
 Allocation: active ──► dormant ──► discontinued
-                 ▲         │           │
-                 └─────────┘           └── registry returns to unallocated pool
+                 ▲         │
+                 └─────────┘
                 (reactivate)
 ```
 
 - **unallocated** — GTIN is in the pool, ready to assign
-- **in_use** — GTIN is assigned to a live product
-- **retired** — product discontinued; GTIN in 48-month cool-down
-- **unallocated (again)** — GTIN back in pool after cool-down
+- **in_use** — GTIN is assigned to a live product (one active allocation per
+  product/company, enforced by a partial UNIQUE index created in `init()`)
+- **retired** — product discontinued. By default the slot stays retired forever;
+  with `allow_gtin_reuse` enabled it re-enters the pool 48 months after the
+  discontinue date
 
 ---
 
@@ -90,7 +95,7 @@ On any product form (requires `stock.group_stock_manager`):
 
 1. The **"Allocate Barcode"** link appears next to the Barcode field when the product has no barcode.
 2. Clicking it atomically claims the next unallocated GTIN from the highest-priority prefix.
-3. The product's `barcode` field is set to the GTIN-13, a packaging record (GTIN-14 outer carton) is created, and a `barcode.gtin.allocated` billing event is emitted.
+3. The product's `barcode` field is set to the GTIN-13 and a `barcode.gtin.allocated` billing event is emitted (via sudo, so non-admin users meter correctly). The GTIN-14 (outer carton) lives on the registry record — `product.packaging` was removed in Odoo 19, so no packaging record is created. Direct edits to a registry-managed `barcode` field are blocked while an allocation is active.
 
 ---
 

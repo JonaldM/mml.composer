@@ -12,34 +12,36 @@ mml.odoo.apps/                         ← This repo (mml.composer on GitHub)
 ├── mml_base/                          ← Platform layer — MUST be installed first
 ├── mml_roq_freight/                   ← Bridge: ROQ Demand ↔ Freight (auto_install)
 ├── mml_freight_3pl/                   ← Bridge: Freight ↔ 3PL (auto_install)
+├── mml_petpro_storefront_user/        ← Min-priv portal RPC user for the headless PetPro storefront
+├── mml_test_sprint/                   ← Standalone Playwright/RPC test harness (NOT an Odoo addon — keep out of addons_path)
 │
-├── fowarder.intergration/             ← Freight domain (own git repo)
+├── mml.fowarder.intergration/         ← Freight domain (git submodule: mml.freight.fowarder)
 │   └── addons/
 │       ├── mml_freight               ← Freight tender, booking, tracking
 │       ├── mml_freight_dsv           ← DSV carrier adapter
-│       ├── mml_freight_mainfreight   ← Mainfreight carrier adapter
-│       ├── mml_freight_knplus        ← KN+ carrier adapter
-│       └── mml_freight_demo          ← Demo data / sandbox
+│       ├── mml_freight_mainfreight   ← Mainfreight carrier adapter (tracking + webhooks; docs/invoice are stubs)
+│       ├── mml_freight_knplus        ← KN+ adapter — SCAFFOLD, raises on use; keep dormant, never enable a KN+ carrier
+│       └── mml_freight_demo          ← Demo data / sandbox (installable=False)
 │
-├── mainfreight.3pl.intergration/      ← 3PL domain (own git repo)
+├── mml.3pl.intergration/              ← 3PL domain (git submodule: mml.3pl.odoo)
 │   └── addons/
 │       ├── stock_3pl_core            ← 3PL platform layer
-│       └── stock_3pl_mainfreight     ← Mainfreight WMS adapter
+│       ├── stock_3pl_mainfreight     ← Mainfreight WMS adapter
+│       └── stock_3pl_rohlig          ← Röhlig connector (inventory pull only today)
 │
-├── briscoes.edi/                      ← EDI domain (own git repo)
-│   └── mml.edi/
-│       └── mml_edi                   ← EDI for retail partners (Briscoes, Harvey Norman, etc.)
+├── mml_edi/                           ← EDI for retail partners (git submodule: mml.edi.odoo)
 │
-├── barcodes/                          ← Barcode domain (own git repo)
+├── mml.barcodes/                      ← Barcode domain (plain directory in this repo)
 │   └── mml_barcode_registry          ← GTIN lifecycle management and allocation
 │
-├── roq.model/                         ← ROQ demand module (to be superseded — see mml.forecasting)
-│   └── mml_roq_forecast              ← Legacy ROQ demand engine
+├── mml.roq.model/                     ← ROQ demand engine (git submodule: mml.roq.odoo)
+│   └── mml_roq_forecast              ← Current production demand engine (mml_forecast_demand will supersede it)
 │
-└── mml.forecasting/                   ← Forecasting suite (own git repo)
+└── mml.forecasting/                   ← Forecasting suite (git submodule: mml.forecasting)
     ├── mml_forecast_core             ← Shared config, FX rates, origin ports, customer/supplier terms
-    ├── mml_forecast_demand           ← ROQ demand engine (migrated from roq.model)
     └── mml_forecast_financial        ← P&L and cashflow financial forecasting
+                                        (mml_forecast_demand — PLANNED, not yet created;
+                                         demand still comes from mml.roq.model/mml_roq_forecast)
 ```
 
 ---
@@ -54,7 +56,7 @@ mml.odoo.apps/                         ← This repo (mml.composer on GitHub)
 |---|---|
 | `mml.capability` | Modules declare what they provide on install; deregister on uninstall. Used by the service locator to decide whether a module is active. |
 | `mml.registry` | Service locator. Call `env['mml.registry'].service('name')` to get a live service object, or a `NullService` (safe no-op) if the module is not installed. |
-| `mml.event` | Persisted event ledger. Modules emit named events with payload. Bridge modules subscribe and react. Each emit is also a billing meter row. |
+| `mml.event` | Persisted event ledger. Modules emit named events with payload. Bridge modules subscribe and react. Each emit is also a billing meter row — for anything that can replay (retries, re-delivered events, cron reruns) use `emit_idempotent(dedupe_key=…)`, which is enforced by a partial UNIQUE index created on fresh install and upgrade. |
 | `mml.event.subscription` | Idempotent subscription records — created on bridge install, removed on bridge uninstall. |
 | `mml.license` | License cache for SaaS mode. Populated by `mml.composer` (external service). Currently a no-op stub. |
 | `mml.platform.sync` | Cron-driven sync task placeholder — reserved for composer heartbeat. |
@@ -120,8 +122,9 @@ Odoo core (base, product, sale, purchase, account, mail)
      mml_base
          |
   mml_forecast_core
-    /           \
-mml_forecast_demand   mml_forecast_financial
+         |
+  mml_forecast_financial      (mml_forecast_demand — planned; demand is
+                               currently provided by mml_roq_forecast)
 ```
 
 > **Note:** All modules — including the forecasting suite — depend on `mml_base`. `mml_forecast_core` declares `mml_base` in its `depends` list alongside `base`, `product`, `sale`, `purchase`, `account`, and `mail`.
@@ -143,13 +146,15 @@ $ODOO -d $DB -i mml_base --stop-after-init
 
 # 3PL
 $ODOO -d $DB -i stock_3pl_core,stock_3pl_mainfreight --stop-after-init
+$ODOO -d $DB -i stock_3pl_rohlig --stop-after-init         # optional: Röhlig (inventory pull only)
 
 # Freight
 $ODOO -d $DB -i mml_freight --stop-after-init
 $ODOO -d $DB -i mml_freight_dsv --stop-after-init          # optional: DSV adapter
 $ODOO -d $DB -i mml_freight_mainfreight --stop-after-init  # optional: Mainfreight adapter
+# mml_freight_knplus is a scaffold — do NOT enable a KN+ carrier in production
 
-# ROQ demand (legacy — use mml_forecast_demand for new installs)
+# ROQ demand (current production demand engine; mml_forecast_demand will supersede it)
 $ODOO -d $DB -i mml_roq_forecast --stop-after-init
 
 # EDI
@@ -163,17 +168,21 @@ $ODOO -d $DB -i mml_barcode_registry --stop-after-init
 # You can also force-install explicitly:
 $ODOO -d $DB -i mml_roq_freight,mml_freight_3pl --stop-after-init
 
-# ─── Step 4: Forecasting suite (independent of mml_base) ─────────────────
+# ─── Step 4: Forecasting suite ────────────────────────────────────────────
 $ODOO -d $DB -i mml_forecast_core --stop-after-init
-$ODOO -d $DB -i mml_forecast_demand --stop-after-init      # ROQ demand engine
 $ODOO -d $DB -i mml_forecast_financial --stop-after-init   # P&L and cashflow
+# (mml_forecast_demand is planned, not yet created — the financial wizard
+#  consumes mml_roq_forecast runs via env.get('roq.forecast.run') when present)
+
+# ─── Step 5 (optional): headless storefront RPC user ─────────────────────
+$ODOO -d $DB -i mml_petpro_storefront_user --stop-after-init
 ```
 
 ### Minimum install (forecasting only, no freight/3PL)
 
 ```bash
 $ODOO -d $DB -i mml_base --stop-after-init
-$ODOO -d $DB -i mml_forecast_core,mml_forecast_demand,mml_forecast_financial --stop-after-init
+$ODOO -d $DB -i mml_forecast_core,mml_forecast_financial --stop-after-init
 ```
 
 ### Minimum install (EDI + barcodes only)
@@ -192,17 +201,22 @@ $ODOO -d $DB -i mml_edi,mml_barcode_registry --stop-after-init
 | `mml_base` | `mml_base/` | False | `base`, `mail` | Platform layer — event bus, service locator, capability registry |
 | `mml_roq_freight` | `mml_roq_freight/` | False | `mml_roq_forecast`, `mml_freight` | Bridge: ROQ ↔ Freight (auto_install) |
 | `mml_freight_3pl` | `mml_freight_3pl/` | False | `mml_freight`, `stock_3pl_core` | Bridge: Freight ↔ 3PL (auto_install) |
-| `mml_freight` | `fowarder.intergration/addons/mml_freight/` | True | `mml_base`, `mail`, `purchase`, `stock`, `account` | Freight tender, quote, booking, tracking |
-| `mml_freight_dsv` | `fowarder.intergration/addons/mml_freight_dsv/` | False | `mml_freight` | DSV carrier adapter |
-| `mml_freight_mainfreight` | `fowarder.intergration/addons/mml_freight_mainfreight/` | False | `mml_freight` | Mainfreight freight adapter |
-| `stock_3pl_core` | `mainfreight.3pl.intergration/addons/stock_3pl_core/` | True | `mml_base`, `stock`, `sale_management`, `purchase` | 3PL platform layer |
-| `stock_3pl_mainfreight` | `mainfreight.3pl.intergration/addons/stock_3pl_mainfreight/` | False | `stock_3pl_core` | Mainfreight WMS adapter |
-| `mml_edi` | `briscoes.edi/mml.edi/` | True | `mml_base`, `sale`, `account`, `stock`, `mail` | EDI for retail partners |
-| `mml_barcode_registry` | `barcodes/mml_barcode_registry/` | True | `mml_base`, `stock`, `product`, `mail` | GTIN lifecycle management and allocation |
-| `mml_roq_forecast` | `roq.model/mml_roq_forecast/` | True | `mml_base` | Legacy ROQ demand engine — superseded by `mml_forecast_demand` |
+| `mml_petpro_storefront_user` | `mml_petpro_storefront_user/` | False | `base`, `sale`, `stock`, `product`, `uom`, `account`, `delivery`, `payment` | Least-privilege portal (`share=True`) RPC user for the headless storefront |
+| `mml_freight` | `mml.fowarder.intergration/addons/mml_freight/` | True | `mml_base`, `mail`, `stock`, `account`, `purchase`, `delivery` | Freight tender, quote, booking, tracking |
+| `mml_freight_dsv` | `mml.fowarder.intergration/addons/mml_freight_dsv/` | False | `mml_freight` | DSV carrier adapter |
+| `mml_freight_mainfreight` | `mml.fowarder.intergration/addons/mml_freight_mainfreight/` | False | `mml_freight` | Mainfreight freight adapter (tracking + webhooks live; docs/invoice stubs) |
+| `mml_freight_knplus` | `mml.fowarder.intergration/addons/mml_freight_knplus/` | False | `mml_freight` | KN+ adapter — scaffold only; excluded from tendering, do not enable |
+| `mml_freight_demo` | `mml.fowarder.intergration/addons/mml_freight_demo/` | False (`installable: False`) | `mml_freight` | Demo data / sandbox |
+| `stock_3pl_core` | `mml.3pl.intergration/addons/stock_3pl_core/` | True | `mml_base`, `mail`, `stock`, `sale_management`, `purchase` | 3PL platform layer |
+| `stock_3pl_mainfreight` | `mml.3pl.intergration/addons/stock_3pl_mainfreight/` | False | `stock_3pl_core` | Mainfreight WMS adapter |
+| `stock_3pl_rohlig` | `mml.3pl.intergration/addons/stock_3pl_rohlig/` | False | `stock_3pl_core`, `mml_base` | Röhlig connector — inventory pull only today |
+| `mml_edi` | `mml_edi/` (submodule) | True | `mml_base`, `sale`, `account`, `stock`, `mail` | EDI for retail partners (Briscoes iDOC live; EDIFACT parser de-listed pending CT→EA parity) |
+| `mml_barcode_registry` | `mml.barcodes/mml_barcode_registry/` | True | `mml_base`, `stock`, `product`, `mail`, `uom` | GTIN lifecycle management and allocation |
+| `mml_roq_forecast` | `mml.roq.model/mml_roq_forecast/` | True | `mml_base` | Current production ROQ demand engine (`mml_forecast_demand` will supersede it) |
 | `mml_forecast_core` | `mml.forecasting/mml_forecast_core/` | **True** | `mml_base`, `base`, `product`, `sale`, `purchase`, `account`, `mail` | Forecasting suite shared infra — FX rates, origin ports, config, terms |
-| `mml_forecast_demand` | `mml.forecasting/mml_forecast_demand/` | False | `mml_forecast_core` | ROQ demand engine (migrated from `mml_roq_forecast`) |
 | `mml_forecast_financial` | `mml.forecasting/mml_forecast_financial/` | False | `mml_base`, `mml_forecast_core`, `account` | P&L and cashflow financial forecasting |
+
+> `mml_forecast_demand` (ROQ demand migrated into the forecasting suite) is **planned but not yet created** — see `mml.forecasting/CLAUDE.md` Sprint 3.
 
 ---
 
@@ -215,8 +229,8 @@ The `mml.forecasting` repo is a standalone git repository at `mml.forecasting/`.
 | Module | `application` | UI entry point |
 |---|---|---|
 | `mml_forecast_core` | True | "Forecasting" app tile — all suite menus live here |
-| `mml_forecast_demand` | False | Adds "Demand Planning" submenu under Forecasting |
 | `mml_forecast_financial` | False | Adds "Financial Planning" submenu under Forecasting |
+| `mml_forecast_demand` | — | **Planned** (Sprint 3): ROQ demand engine migrated from `mml_roq_forecast` |
 
 ### Key shared models (in mml_forecast_core)
 
@@ -230,14 +244,18 @@ The `mml.forecasting` repo is a standalone git repository at `mml.forecasting/`.
 
 ### Demand interface contract
 
-`mml_forecast_demand` exposes a standard interface on `roq.forecast.run`:
+The demand provider exposes a standard interface on `roq.forecast.run` — today that
+model is provided by the **legacy `mml_roq_forecast`** module (`mml.roq.model`
+submodule); the planned `mml_forecast_demand` will implement the same contract:
 
 ```python
 run.get_demand_forecast(date_start: date, horizon_months: int) -> list[dict]
 # Each dict: {product_id, partner_id, period_start, period_label, forecast_units, brand, category}
+# partner_id is False when demand is not customer-attributed.
 ```
 
-`mml_forecast_financial` calls this via `self.env.get('roq.forecast.run')` — no hard import.
+`mml_forecast_financial` calls this via `self.env.get('roq.forecast.run')` — no hard
+import; it falls back to trailing 12-month sale history when no complete run exists.
 
 ---
 
@@ -278,17 +296,23 @@ bumps the pointer in a follow-up commit. Full workflow:
 | `mml.freight.fowarder` | [JonaldM/mml.freight.fowarder](https://github.com/JonaldM/mml.freight.fowarder) | `mml_freight` + carrier adapters |
 | `mml.3pl.odoo` | [JonaldM/mml.3pl.odoo](https://github.com/JonaldM/mml.3pl.odoo) | `stock_3pl_core` + `stock_3pl_mainfreight` |
 | `mml.edi.odoo` | [JonaldM/mml.edi.odoo](https://github.com/JonaldM/mml.edi.odoo) | `mml_edi` |
-| `mml.composer` | [JonaldM/mml.composer](https://github.com/JonaldM/mml.composer) | SaaS platform: license server, billing engine, multi-instance dashboard |
+| `mml.composer` | [JonaldM/mml.composer](https://github.com/JonaldM/mml.composer) | **This monorepo's GitHub name.** (The *planned* SaaS platform — license server, billing engine, multi-instance dashboard — shares the "mml.composer" name but is a separate, not-yet-built service; `mml.license`/`mml.platform.sync` in `mml_base` are its client-side stubs.) |
 
-> `mml.roq.odoo` (legacy ROQ repo) is archived. Development continues in `mml.forecasting/mml_forecast_demand`.
+> `mml.roq.odoo` still hosts the **production demand engine** (`mml_roq_forecast`).
+> It will be superseded by `mml.forecasting/mml_forecast_demand` once that module is
+> built (Sprint 3) — until then, do not treat the ROQ repo as archived.
 
 ---
 
 ## Running Tests
 
 ```bash
-# Pure-Python unit tests (no Odoo instance required)
+# Pure-Python unit tests (no Odoo instance required) — the whole monorepo
+# collects and runs green from the root (1085 tests as of 2026-06-10):
 cd mml.odoo.apps
+pytest -m "not odoo_integration" -q
+
+# Or scope to a workspace/module:
 pytest mml_base/ mml_roq_freight/ mml_freight_3pl/ -m "not odoo_integration" -v
 
 # Odoo integration tests — platform layer
@@ -299,8 +323,8 @@ odoo-bin --test-enable --stop-after-init -d testdb \
 # Forecasting suite tests
 cd mml.forecasting
 odoo-bin --test-enable --stop-after-init -d testdb \
-  -i mml_forecast_core,mml_forecast_demand,mml_forecast_financial \
-  --test-tags=mml_forecast_core,mml_forecast_demand,mml_forecast_financial
+  -i mml_forecast_core,mml_forecast_financial \
+  --test-tags=mml_forecast_core,mml_forecast_financial
 ```
 
 ---
@@ -315,4 +339,4 @@ odoo-bin --test-enable --stop-after-init -d testdb \
 
 4. **Every mml_* app is independently installable.** A customer can buy just EDI, just freight, just forecasting — no forced bundle.
 
-5. **`mml_base` is the only shared dependency for operational modules.** The forecasting suite is intentionally isolated from `mml_base` so it can be sold standalone without dragging in the event bus infrastructure.
+5. **`mml_base` is the single shared dependency.** Every mml_* module — including the forecasting suite (`mml_forecast_core` declares `mml_base` in its depends) — sits on the same platform layer, so events, services, and the billing meter work uniformly across the whole suite.

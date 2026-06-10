@@ -159,7 +159,7 @@ Modules communicate via shared Odoo models, chatter (`mail.message`), and comput
 | Trigger | Source | Consumer | Action |
 |---------|--------|----------|--------|
 | SO confirmed (EDI partner) | `mml_edi` | `stock_3pl_mainfreight` | Queue despatch to Mainfreight |
-| Mainfreight despatch confirmed | `stock_3pl_mainfreight` | `mml_edi` | Generate & send ASN |
+| Mainfreight despatch confirmed | `stock_3pl_mainfreight` | `mml_edi` | Generate & send ASN — ⚠️ **not yet wired**: no emitter exists in the 3PL modules and no subscription is registered (design target) |
 | PO confirmed (MML freight) | `purchase` | `mml_freight` | Create tender, request quotes |
 | `freight.booking` confirmed | `mml_freight` | `stock_3pl_core` | Create `3pl.message` (inward_order) |
 | Freight delivered | `mml_freight` | `stock_3pl_mainfreight` | Trigger inbound receipt |

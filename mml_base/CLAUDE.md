@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Key Design Constraints
 
-**Handler method names are security-enforced.** `mml.event.subscription.dispatch()` rejects any `handler_method` that does not match `^_on_[a-z_]+$`. All event handler methods across every module must follow that naming convention.
+**Handler method names are security-enforced.** `mml.event.subscription.dispatch()` rejects any `handler_method` that does not match `^_on_[a-z0-9_]+$`. All event handler methods across every module must follow that naming convention.
 
 **Service locator never raises.** `mml.registry.service('some_service')` returns `NullService` (all calls silently return `None`) when the module is not installed. Callers must not test the return type — they call it and move on.
 
@@ -47,7 +47,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Why this matters: producer module A is billed for emitting the event. A bug in some unrelated module B's handler must NOT roll back A's billing record. Before this change, a single failing handler would tear down the entire transaction including the `mml.event.create()`. Now failures are sandboxed per-subscriber.
 
-The handler-method allowlist (`^_on_[a-z_]+$`) is still enforced **before** invocation — rejected subscriptions never enter a savepoint and never log a failure row.
+The handler-method allowlist (`^_on_[a-z0-9_]+$`) is still enforced **before** invocation — rejected subscriptions never enter a savepoint and never log a failure row.
 
 ### Triaging failures
 
@@ -98,7 +98,7 @@ def post_init_hook(env):
     env['mml.event.subscription'].register(
         event_type='freight.booking.confirmed',
         handler_model='my.model',
-        handler_method='_on_freight_booking_confirmed',  # MUST match ^_on_[a-z_]+$
+        handler_method='_on_freight_booking_confirmed',  # MUST match ^_on_[a-z0-9_]+$
         module='my_module',
     )
 ```
@@ -159,8 +159,9 @@ self.env['mml.event'].emit_idempotent(
 If `dedupe_key` was already used, the existing event is returned and
 **no new row is created** — `dispatch()` only fires on the first emit.
 A partial `UNIQUE` index on `mml_event(dedupe_key) WHERE dedupe_key IS
-NOT NULL` (added in `19.0.1.1.0`) protects against concurrent
-duplicates at the database level.
+NOT NULL` protects against concurrent duplicates at the database level —
+created by `MmlEvent.init()` (fresh installs AND upgrades; Odoo never runs
+migrations/ on `-i`) and mirrored by the `19.0.1.1.0` migration.
 
 Use plain `emit()` only when no stable key is available (e.g. an
 ad-hoc telemetry event with no domain anchor). Mixing the two is
@@ -171,7 +172,7 @@ the partial UNIQUE index.
 
 ## Tests
 
-All tests in `tests/` extend `TransactionCase` and require a live Odoo database (`odoo_integration` marker). There are no pure-Python tests in this module — the models are thin enough that meaningful tests require the ORM.
+`tests/` carries BOTH tiers: `test_pure_*.py` files run under plain `pytest` with no Odoo (dispatch isolation, handler regex, emit signatures, registry constants — they importlib-load the real model code against the conftest stubs), and the remaining `TransactionCase` files require a live Odoo database (`odoo_integration` marker).
 
 ```bash
 # Run mml_base integration tests

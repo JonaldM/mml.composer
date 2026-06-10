@@ -70,8 +70,10 @@ dormant → discontinued  (blocked until reuse_eligible_date; returns registry s
 3. Creates `mml.barcode.allocation` record.
 4. Sets `registry.status = 'in_use'`.
 5. Writes GTIN-13 to `product.barcode`.
-6. Creates a `product.packaging` record (name `'Outer Carton'`) with the GTIN-14.
-7. Emits `barcode.gtin.allocated` event to `mml.event` (best-effort; failure does not roll back the allocation).
+6. (No packaging record — `product.packaging` was removed in Odoo 19; the GTIN-14
+   stays on the registry record, `registry.gtin_14`.)
+7. Emits `barcode.gtin.allocated` event to `mml.event` via `sudo()` (best-effort;
+   failure logs a warning and does not roll back the allocation).
 
 ### GS1 Math (`services/gs1.py`)
 
