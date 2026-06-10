@@ -28,6 +28,7 @@ Manual operator steps after install: see
         'sale',
         'stock',
         'product',
+        'uom',
         'account',
         'delivery',
         'payment',

@@ -20,6 +20,7 @@
         'views/barcode_allocation_views.xml',
         'views/mml_brand_views.xml',
         'views/barcode_prefix_views.xml',
+        'views/res_company_views.xml',
         'views/product_views.xml',
         'views/dashboard_views.xml',
         'views/menu.xml',

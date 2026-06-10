@@ -48,7 +48,15 @@ def _install_odoo_stubs():
             return datetime.datetime.utcnow()
 
     class Date(_BaseField):
-        pass
+        @classmethod
+        def today(cls):
+            import datetime
+            return datetime.date.today()
+
+        @classmethod
+        def context_today(cls, record=None, timestamp=None):
+            import datetime
+            return datetime.date.today()
 
     class Many2one(_BaseField):
         pass
@@ -77,6 +85,10 @@ def _install_odoo_stubs():
     class Json(_BaseField):
         pass
 
+    class Monetary(_BaseField):
+        pass
+
+    odoo_fields.Monetary = Monetary
     odoo_fields.Selection = Selection
     odoo_fields.Boolean = Boolean
     odoo_fields.Char = Char
@@ -144,8 +156,16 @@ def _install_odoo_stubs():
     class UserError(Exception):
         pass
 
+    class MissingError(Exception):
+        pass
+
+    class AccessError(Exception):
+        pass
+
     odoo_exceptions.ValidationError = ValidationError
     odoo_exceptions.UserError = UserError
+    odoo_exceptions.MissingError = MissingError
+    odoo_exceptions.AccessError = AccessError
 
     # ---- odoo.tests ----
     import unittest
@@ -170,6 +190,7 @@ def _install_odoo_stubs():
     odoo_tests_common = types.ModuleType('odoo.tests.common')
     odoo_tests_common.TransactionCase = TransactionCase
     odoo_tests_common.HttpCase = HttpCase
+    odoo_tests_common.tagged = tagged
 
     # ---- odoo.http ----
     odoo_http = types.ModuleType('odoo.http')
@@ -214,6 +235,46 @@ def _install_odoo_stubs():
     odoo_addons = types.ModuleType('odoo.addons')
     sys.modules['odoo.addons'] = odoo_addons
     odoo.addons = odoo_addons
+
+    # Register every addon in the monorepo as an importable
+    # ``odoo.addons.<name>`` package (same pattern as the workspace
+    # conftests, e.g. mml.forecasting/conftest.py) so model/wizard code that
+    # does ``from odoo.addons.<addon>.models.x import Y`` collects under a
+    # combined root run, not only per-workspace. Guarded with
+    # ``not in sys.modules`` so workspace conftests keep precedence.
+    _ADDON_PARENTS = (
+        _ROOT,
+        _ROOT / 'mml.fowarder.intergration' / 'addons',
+        _ROOT / 'mml.3pl.intergration' / 'addons',
+        _ROOT / 'mml.barcodes',
+        _ROOT / 'mml.forecasting',
+        _ROOT / 'mml.roq.model',
+    )
+    _ADDON_SUBDIRS = ('models', 'services', 'wizard', 'wizards', 'document',
+                      'parsers', 'adapters', 'controllers', 'transport')
+    for parent in _ADDON_PARENTS:
+        if not parent.is_dir():
+            continue
+        for addon_path in parent.iterdir():
+            if not (addon_path / '__manifest__.py').is_file():
+                continue
+            addon_name = addon_path.name
+            full_name = f'odoo.addons.{addon_name}'
+            if full_name not in sys.modules:
+                pkg = types.ModuleType(full_name)
+                pkg.__path__ = [str(addon_path)]
+                pkg.__package__ = full_name
+                sys.modules[full_name] = pkg
+                setattr(odoo_addons, addon_name, pkg)
+            for sub in _ADDON_SUBDIRS:
+                if not (addon_path / sub).is_dir():
+                    continue
+                sub_full = f'{full_name}.{sub}'
+                if sub_full not in sys.modules:
+                    sub_pkg = types.ModuleType(sub_full)
+                    sub_pkg.__path__ = [str(addon_path / sub)]
+                    sub_pkg.__package__ = sub_full
+                    sys.modules[sub_full] = sub_pkg
 
 
 _install_odoo_stubs()

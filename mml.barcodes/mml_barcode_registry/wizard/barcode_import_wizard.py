@@ -71,13 +71,26 @@ class BarcodeImportWizard(models.TransientModel):
         Registry = self.env['mml.barcode.registry']
         Allocation = self.env['mml.barcode.allocation']
 
+        prefix_value = (self.prefix_id.prefix or '').strip()
+
         for i, row in enumerate(rows, start=2):  # row 1 is header
             sequence = str(row.get('sequence', '') or '').strip()
             gtin_13_raw = str(row.get('gtin_13', '') or '').strip()
             description = str(row.get('description', '') or '').strip()
+            default_code = str(row.get('default_code', '') or '').strip()
 
             if not sequence or len(sequence) != 12 or not sequence.isdigit():
                 warnings.append(f"Row {i}: invalid sequence '{sequence}' — skipped.")
+                continue
+
+            # The sequence must belong to the selected prefix, otherwise the
+            # operator picked the wrong target prefix and the GTIN-13/14 derived
+            # here would be attributed to the wrong GS1 company prefix.
+            if prefix_value and not sequence.startswith(prefix_value):
+                warnings.append(
+                    f"Row {i}: sequence {sequence} does not start with the selected "
+                    f"prefix {prefix_value!r} — skipped."
+                )
                 continue
 
             # Validate check digit; use computed value regardless
@@ -106,15 +119,36 @@ class BarcodeImportWizard(models.TransientModel):
                 })
                 created += 1
 
-            # Try to match and allocate to a product
-            if description and registry.status == 'unallocated':
-                product = self.env['product.product'].search([
-                    ('barcode', '=', expected_gtin13),
-                ], limit=1)
-                if not product:
-                    product = self.env['product.product'].search([
-                        ('name', 'ilike', description),
-                    ], limit=1)
+            # Try to match and allocate to a product. Matching must be EXACT and
+            # UNIQUE — a fuzzy `name ilike description` match silently allocated a
+            # GTIN to the wrong product during migration. Order of precedence:
+            # exact barcode, then exact default_code (internal reference), then
+            # exact (unique) name. Ambiguous rows are skipped and reported.
+            if (description or default_code) and registry.status == 'unallocated':
+                Product = self.env['product.product']
+                product = Product.search([('barcode', '=', expected_gtin13)], limit=1)
+
+                if not product and default_code:
+                    candidates = Product.search([('default_code', '=', default_code)])
+                    if len(candidates) > 1:
+                        warnings.append(
+                            f"Row {i}: internal reference {default_code!r} matches "
+                            f"{len(candidates)} products — ambiguous, not allocated."
+                        )
+                        continue
+                    product = candidates[:1]
+
+                if not product and description:
+                    # Exact (case-insensitive) name match only, and only if unique.
+                    candidates = Product.search([('name', '=ilike', description)])
+                    if len(candidates) > 1:
+                        warnings.append(
+                            f"Row {i}: product name {description!r} matches "
+                            f"{len(candidates)} products — ambiguous, not allocated. "
+                            f"Add a 'default_code' column to disambiguate."
+                        )
+                        continue
+                    product = candidates[:1]
 
                 if product:
                     alloc = Allocation.search([

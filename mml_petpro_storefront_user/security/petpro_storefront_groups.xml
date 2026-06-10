@@ -15,7 +15,7 @@
     -->
     <record id="group_petpro_storefront" model="res.groups">
         <field name="name">MML PetPro Storefront</field>
-        <field name="category_id" ref="base.module_category_hidden"/>
+        <!-- res.groups.category_id was removed in Odoo 19 (groups use privileges now); the hidden-category tag was cosmetic -->
         <field name="comment">Minimum-privilege role for the headless PetPro Next.js storefront RPC account. Grants read access to the catalogue and stock, plus narrow read/write/create on sale.order, sale.order.line, and res.partner (for guest delivery addresses). Never grant to a real user.</field>
     </record>
 </odoo>

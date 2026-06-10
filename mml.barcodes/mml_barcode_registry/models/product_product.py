@@ -52,6 +52,29 @@ class ProductProduct(models.Model):
                 )
 
     def write(self, vals):
+        # Guard direct edits to a registry-managed barcode. If a product has an
+        # active allocation, its barcode is owned by the registry; clearing or
+        # overwriting it here would leave the allocation 'active' / registry
+        # 'in_use' while the product no longer carries the GTIN. Allow the write
+        # only when the new barcode matches the active allocation's GTIN-13.
+        if 'barcode' in vals:
+            Allocation = self.env['mml.barcode.allocation']
+            for product in self:
+                active_alloc = Allocation.search([
+                    ('product_id', '=', product.id),
+                    ('status', '=', 'active'),
+                ], limit=1)
+                if not active_alloc:
+                    continue
+                managed_gtin = active_alloc.registry_id.gtin_13
+                if vals['barcode'] != managed_gtin:
+                    raise UserError(
+                        f"Product '{product.display_name}' has an active barcode "
+                        f"allocation (GTIN-13 {managed_gtin}). Its barcode is managed "
+                        f"by the barcode registry and cannot be changed or cleared "
+                        f"directly. Discontinue or deactivate the allocation first."
+                    )
+
         res = super().write(vals)
         if 'active' not in vals:
             return res
@@ -134,19 +157,19 @@ class ProductProduct(models.Model):
         # 6. Write GTIN-13 to product barcode field
         self.write({'barcode': registry.gtin_13})
 
-        # 7. Create GTIN-14 outer carton packaging record.
-        # In Odoo 17+, product.packaging.product_id points to product.template,
-        # not product.product. Use product_tmpl_id to get the template ID.
-        self.env['product.packaging'].create({
-            'name': 'Outer Carton',
-            'product_id': self.product_tmpl_id.id,
-            'barcode': registry.gtin_14,
-            'qty': 1.0,
-        })
+        # 7. The GTIN-14 (outer carton) is already modelled on the registry
+        # record (registry.gtin_14). The product.packaging model was removed in
+        # Odoo 19 (merged into UoM), so we no longer create a packaging record —
+        # doing so would crash and roll back the whole allocation. Consumers that
+        # need the GTIN-14 read it from the allocation's registry_id.gtin_14.
 
-        # 8. Emit billing event — best-effort; failure must not roll back the allocation
+        # 8. Emit billing event — best-effort; failure must not roll back the
+        # allocation. Emit as sudo: the mml.event ledger ACL grants base.group_user
+        # read only, so a non-admin clicking allocate cannot create the event as
+        # themselves and it would be silently lost. Still resilient (warn on
+        # failure) so a ledger problem never rolls back a successful allocation.
         try:
-            self.env['mml.event'].emit(
+            self.env['mml.event'].sudo().emit(
                 'barcode.gtin.allocated',
                 billable_unit='gtin',
                 quantity=1.0,
@@ -156,10 +179,11 @@ class ProductProduct(models.Model):
                 payload={'gtin_13': registry.gtin_13, 'gtin_14': registry.gtin_14},
             )
         except Exception:
-            _logger.exception(
+            _logger.warning(
                 "Failed to emit barcode.gtin.allocated event for product %s "
                 "(gtin_13=%s). Allocation succeeded.",
                 self.id, registry.gtin_13,
+                exc_info=True,
             )
 
         return {

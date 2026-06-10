@@ -13,7 +13,9 @@ Handler: mml.roq.freight.bridge
   _on_freight_booking_confirmed(event)
       - Guards on event.res_id (no-op if falsy)
       - Calls mml.registry.service('roq') -> ROQService.on_freight_booking_confirmed(event)
-      - On exception: logs warning, returns (does not re-raise)
+      - On exception: PROPAGATES. The handler no longer swallows failures so the
+        mml_base dispatcher (mml.event.subscription._dispatch_one) records them in
+        mml.event.dispatch.failure via its per-handler savepoint.
 """
 import json
 import types
@@ -401,15 +403,16 @@ class TestOnFreightBookingConfirmed:
 
         assert roq_svc.on_freight_booking_confirmed_calls == []
 
-    def test_exception_from_roq_service_does_not_propagate(self):
-        """Handler catches exceptions from ROQ service and does not re-raise."""
+    def test_exception_from_roq_service_propagates(self):
+        """Handler lets ROQ-service exceptions propagate so the mml_base dispatcher
+        can record them in mml.event.dispatch.failure (no longer swallowed)."""
         roq_svc = MockROQServiceRaises(exc=RuntimeError("roq failure"))
         env = _make_env(registry_map={'roq': roq_svc})
         handler = _make_handler(env)
         event = self._event(res_id=20)
 
-        # Must not raise
-        handler._on_freight_booking_confirmed(event)
+        with pytest.raises(RuntimeError):
+            handler._on_freight_booking_confirmed(event)
 
     def test_null_service_does_not_raise(self):
         """Handler does not raise when registry returns a NullService."""

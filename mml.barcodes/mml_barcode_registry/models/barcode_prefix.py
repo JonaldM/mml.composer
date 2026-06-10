@@ -2,6 +2,10 @@ from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 _MAX_GENERATE_RANGE = 100_000
+# A 12-digit sequence is the 7-digit prefix + a 5-digit serial; the serial is
+# zero-padded to 5 digits, so it must fit in 5 digits (0..99999). A sequence_end
+# above this overflows zfill(5) into 6+ digits and breaks the 12-digit invariant.
+_MAX_SEQUENCE_SERIAL = 99_999
 
 
 class BarcodePrefix(models.Model):
@@ -99,6 +103,16 @@ class BarcodePrefix(models.Model):
                 f"Range of {total:,} sequences exceeds the maximum of "
                 f"{_MAX_GENERATE_RANGE:,} allowed per operation. "
                 f"Split your prefix block into smaller ranges."
+            )
+        # Each serial is zero-padded to 5 digits to keep the sequence 12 digits.
+        # A serial above 99999 would widen the sequence and corrupt the GTIN.
+        if self.sequence_start < 0 or self.sequence_end > _MAX_SEQUENCE_SERIAL:
+            raise UserError(
+                f"Sequence range must fall within 0–{_MAX_SEQUENCE_SERIAL:,} "
+                f"(got {self.sequence_start:,}–{self.sequence_end:,}). The serial "
+                f"is zero-padded to 5 digits; values above {_MAX_SEQUENCE_SERIAL:,} "
+                f"would break the 12-digit sequence. Use an additional GS1 prefix "
+                f"block for more capacity."
             )
         Registry = self.env['mml.barcode.registry']
 

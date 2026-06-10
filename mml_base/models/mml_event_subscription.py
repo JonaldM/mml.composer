@@ -2,11 +2,21 @@ import logging
 import re
 import traceback as _traceback
 
+try:
+    from psycopg2 import OperationalError
+except ImportError:  # pure-python test harness: psycopg2 absent or stubbed flat
+    class OperationalError(Exception):
+        """Stand-in when psycopg2 isn't importable (stubbed test env)."""
+
 from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
-_HANDLER_METHOD_RE = re.compile(r'^_on_[a-z_]+$')
+# Handler methods must look like ``_on_freight_booking_confirmed``. Digits are
+# allowed (the event namespace includes e.g. ``3pl.*``, so handlers like
+# ``_on_3pl_inbound_queued`` are legitimate); the leading ``_on_`` keeps the
+# allowlist tight against arbitrary getattr dispatch.
+_HANDLER_METHOD_RE = re.compile(r'^_on_[a-z0-9_]+$')
 
 
 def _is_valid_handler_method(name: str) -> bool:
@@ -105,8 +115,25 @@ class MmlEventSubscription(models.Model):
             with self.env.cr.savepoint():
                 model = self.env.get(sub.handler_model)
                 if model is None:
+                    # Stale subscription (module uninstalled without its hook,
+                    # or model renamed). Log at ERROR so the lost delivery is
+                    # visible for triage rather than vanishing silently.
+                    _logger.error(
+                        'mml.event: subscription id=%s targets unknown model '
+                        '%r (handler %s); event %s NOT delivered. Clean up or '
+                        're-register this subscription.',
+                        sub.id, sub.handler_model, sub.handler_method,
+                        event.event_type,
+                    )
                     return
                 getattr(model, sub.handler_method)(event)
+        except OperationalError:
+            # Serialization failure / deadlock (pgcode 40001 / 40P01) is
+            # transient and has already poisoned the cursor — re-raise so
+            # Odoo's request layer retries the whole transaction instead of
+            # recording a misleading permanent failure row and continuing on a
+            # dead cursor.
+            raise
         except Exception as exc:  # noqa: BLE001 — by design: handler isolation
             # The savepoint context manager has already rolled back the
             # handler's DB writes by the time we get here. Now persist a

@@ -36,11 +36,11 @@ class BarcodeAllocation(models.Model):
     # models.Constraint was removed in favour of _sql_constraints in Odoo 19;
     # the v17 models.Constraint API that accepted a WHERE clause caused
     # TypeError: issubclass() arg 1 must be a class during metaclass processing.
-    # The ORM-level @api.constrains _check_unique_active_allocation below enforces
-    # uniqueness for normal operations.
-    # For PostgreSQL-level race protection, apply this migration once after install:
-    #   CREATE UNIQUE INDEX IF NOT EXISTS barcode_alloc_active_uniq
-    #   ON mml_barcode_allocation (product_id, company_id) WHERE status = 'active';
+    # Instead the partial index is created in init() below (runs on install and
+    # every upgrade) for PostgreSQL-level race protection — two concurrent txns
+    # both pass the ORM @api.constrains under READ COMMITTED, so the DB index is
+    # the real guard. The ORM-level @api.constrains _check_unique_active_allocation
+    # below remains as a friendly-error fallback for the common case.
 
     registry_id = fields.Many2one(
         'mml.barcode.registry',
@@ -74,7 +74,9 @@ class BarcodeAllocation(models.Model):
     discontinue_date = fields.Date()
     reuse_eligible_date = fields.Date(
         string='Reuse Eligible Date',
-        help='Earliest date GTIN can be reallocated (allocation_date + 48 months, per GS1 best practice)',
+        help='Earliest date GTIN can be reallocated (discontinue/last-supply date '
+             '+ 48 months). Note: GS1 policy since 2019 is not to reuse GTINs at all; '
+             'reuse is disabled unless the company opts in via "Allow GTIN reuse".',
     )
     notes = fields.Text()
     company_id = fields.Many2one(
@@ -82,6 +84,18 @@ class BarcodeAllocation(models.Model):
         required=True,
         default=lambda self: self.env.company,
     )
+
+    def init(self):
+        # Enforce one active allocation per (product, company) at the DB level.
+        # A partial unique index is the only thing that closes the concurrent-
+        # insert race two READ COMMITTED transactions slip through the
+        # @api.constrains check with. BaseModel.init() runs on install and on
+        # every module upgrade; IF NOT EXISTS keeps it idempotent.
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS barcode_allocation_active_uniq
+            ON mml_barcode_allocation (product_id, company_id)
+            WHERE status = 'active'
+        """)
 
     @api.depends('gtin_13', 'product_id.display_name', 'status')
     def _compute_display_name(self):
@@ -123,11 +137,14 @@ class BarcodeAllocation(models.Model):
         for rec in self:
             rec._validate_transition('dormant')
             today = date.today()
-            reuse_start = rec.allocation_date or today
+            # Cool-down baseline is the discontinue / last-supply date (today the
+            # product stops being supplied), NOT allocation_date. Basing it on
+            # allocation_date made a SKU allocated >4 years ago reuse-eligible the
+            # instant it was archived — while it could still be on retailer shelves.
             rec.write({
                 'status': 'dormant',
                 'discontinue_date': today,
-                'reuse_eligible_date': reuse_start + relativedelta(months=48),
+                'reuse_eligible_date': today + relativedelta(months=48),
             })
 
     def action_reactivate(self):
@@ -143,36 +160,53 @@ class BarcodeAllocation(models.Model):
     def action_discontinue(self):
         """
         Transition dormant → discontinued.
-        Validates 48-month cool-down. Returns registry slot to pool.
+
+        Returning the registry slot to the unallocated pool (GTIN reuse) only
+        happens when the company has opted in via company.allow_gtin_reuse AND the
+        48-month cool-down has elapsed — GS1 policy since 2019 is not to reuse
+        GTINs at all. When reuse is disabled the slot is retired instead, so the
+        GTIN is never handed to another product.
         """
         today = date.today()
         for rec in self:
             rec._validate_transition('discontinued')
-            if not rec.reuse_eligible_date:
-                raise UserError(
-                    f"GTIN {rec.gtin_13 or rec.registry_id.sequence!r} has no reuse eligible "
-                    f"date set. Set 'discontinue_date' and allow the system to compute "
-                    f"the eligibility date before discontinuing."
-                )
-            if rec.reuse_eligible_date > today:
-                months = _months_until(rec.reuse_eligible_date, today)
-                raise UserError(
-                    f"GTIN {rec.gtin_13} cannot be discontinued yet. "
-                    f"Reuse eligible in approximately {months} month(s) "
-                    f"(eligible date: {rec.reuse_eligible_date})."
-                )
+            reuse_allowed = rec.company_id.allow_gtin_reuse
+
+            if reuse_allowed:
+                # Only enforce/require the cool-down when reuse is actually on the
+                # table — otherwise the slot is simply retired below.
+                if not rec.reuse_eligible_date:
+                    raise UserError(
+                        f"GTIN {rec.gtin_13 or rec.registry_id.sequence!r} has no reuse eligible "
+                        f"date set. Set 'discontinue_date' and allow the system to compute "
+                        f"the eligibility date before discontinuing."
+                    )
+                if rec.reuse_eligible_date > today:
+                    months = _months_until(rec.reuse_eligible_date, today)
+                    raise UserError(
+                        f"GTIN {rec.gtin_13} cannot be discontinued yet. "
+                        f"Reuse eligible in approximately {months} month(s) "
+                        f"(eligible date: {rec.reuse_eligible_date})."
+                    )
+
             rec.write({'status': 'discontinued'})
-            # Return registry slot to pool if this is the active allocation
-            registry = rec.registry_id
-            # Only clear the registry slot if this allocation is still the current one.
-            # Filters on both id and current_allocation_id to avoid a TOCTOU window
-            # where a concurrent allocation has already claimed the slot.
+
+            # Update the registry slot only if this allocation is still the current
+            # one. Filters on both id and current_allocation_id to avoid a TOCTOU
+            # window where a concurrent allocation has already claimed the slot.
             registry_to_clear = self.env['mml.barcode.registry'].search([
-                ('id', '=', registry.id),
+                ('id', '=', rec.registry_id.id),
                 ('current_allocation_id', '=', rec.id),
             ])
             if registry_to_clear:
-                registry_to_clear.write({
-                    'status': 'unallocated',
-                    'current_allocation_id': False,
-                })
+                if reuse_allowed:
+                    # Opted in + cooled down: GTIN may be reassigned.
+                    registry_to_clear.write({
+                        'status': 'unallocated',
+                        'current_allocation_id': False,
+                    })
+                else:
+                    # Default: never reuse. Retire the slot (in_use → retired) so
+                    # the GTIN is permanently taken out of circulation.
+                    registry_to_clear.action_retire()
+                    registry_to_clear.write({'current_allocation_id': False})

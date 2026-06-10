@@ -46,8 +46,25 @@ the storefront container.
 | `account.move.line` | yes | no | no | no |
 | `delivery.carrier` | yes | no | no | no |
 | `payment.transaction` | yes | no | no | no |
+| `res.country` | yes | no | no | no |
+| `res.country.state` | yes | no | no | no |
+| `res.currency` | yes | no | no | no |
+| `uom.uom` | yes | no | no | no |
+| `uom.category` | yes | no | no | no |
+| `account.tax` | yes | no | no | no |
 
 Every other model is implicitly denied (Odoo's default).
+
+### User type: portal/share, not internal
+
+The RPC user is a **share user** (`share=True`) and is **not** a member of
+`base.group_user`. An internal `base.group_user` carries a broad implied-read
+surface (e.g. `res.users` enumeration and most master data), which defeats the
+least-privilege purpose of this module. Instead the master-data reads the
+catalogue and guest-checkout flows actually need — countries, country states,
+currency, units of measure, and taxes — are granted explicitly read-only above.
+If a future storefront flow needs an internal-only model, add a narrow explicit
+ACL for that model rather than re-adding `base.group_user`.
 
 ### Row-level scoping (record rules)
 

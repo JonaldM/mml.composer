@@ -15,7 +15,10 @@ Logic:
            mml.event.emit('3pl.inbound.queued', ...)    <- billable event
        else:
            log warning only, no event emitted
-  6. Any exception from the above block: log warning, return (no re-raise).
+  6. Any exception from the above block PROPAGATES to the caller. The bridge no
+     longer swallows handler failures: mml.event.subscription._dispatch_one wraps
+     each handler in its own savepoint and records failures in
+     mml.event.dispatch.failure. Swallowing here would hide them from that ledger.
 """
 import types
 import pytest
@@ -323,8 +326,9 @@ class TestOnFreightBookingConfirmed:
         assert env.emitted[0]['event_type'] == '3pl.inbound.queued'
         assert env.emitted[0]['res_id'] == 7
 
-    def test_exception_from_queue_inward_order_does_not_propagate(self):
-        """Exception from queue_inward_order is caught; handler does not re-raise."""
+    def test_exception_from_queue_inward_order_propagates(self):
+        """Exception from queue_inward_order propagates so the mml_base dispatcher
+        can record it in mml.event.dispatch.failure (handler no longer swallows)."""
         svc = Mock3PLServiceRaises(exc=ConnectionError("3pl down"))
         po = _make_po(po_id=3)
         booking = _make_booking(res_id=10, po_ids=[po])
@@ -334,11 +338,12 @@ class TestOnFreightBookingConfirmed:
         )
         handler = _make_handler(env)
 
-        # Must not raise
-        handler._on_freight_booking_confirmed(_event(res_id=10))
+        with pytest.raises(ConnectionError):
+            handler._on_freight_booking_confirmed(_event(res_id=10))
 
-    def test_exception_suppresses_all_billing_events(self):
-        """When queue_inward_order raises, no billing event is emitted."""
+    def test_exception_emits_no_billing_event_before_raising(self):
+        """When queue_inward_order raises on the first PO, no billing event is
+        emitted before the exception propagates."""
         svc = Mock3PLServiceRaises()
         po = _make_po(po_id=3)
         booking = _make_booking(res_id=10, po_ids=[po])
@@ -348,7 +353,8 @@ class TestOnFreightBookingConfirmed:
         )
         handler = _make_handler(env)
 
-        handler._on_freight_booking_confirmed(_event(res_id=10))
+        with pytest.raises(Exception):
+            handler._on_freight_booking_confirmed(_event(res_id=10))
 
         assert env.emitted == []
 

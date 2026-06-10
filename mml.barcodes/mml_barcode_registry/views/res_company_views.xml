@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Expose the GTIN-reuse opt-in on the company form. GS1 policy since 2019
+        is not to reuse GTINs; this flag stays off unless MML deliberately turns
+        it on. Kept on the company form (rather than a settings panel) to avoid a
+        dependency on res.config.settings.
+    -->
+    <record id="view_company_form_gtin_reuse" model="ir.ui.view">
+        <field name="name">res.company.form.gtin.reuse</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <sheet position="inside">
+                <group string="Barcode Registry" name="mml_barcode_registry">
+                    <field name="allow_gtin_reuse"/>
+                </group>
+            </sheet>
+        </field>
+    </record>
+</odoo>

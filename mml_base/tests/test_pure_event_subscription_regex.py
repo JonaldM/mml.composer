@@ -85,10 +85,18 @@ class TestIsValidHandlerMethodRejects:
         assert _is_valid_handler_method('_on_Event') is False
         assert _is_valid_handler_method('_ON_EVENT') is False
 
-    def test_digits_rejected(self):
-        """No digits allowed in [a-z_]+ — ``_on_event_2`` is rejected."""
-        assert _is_valid_handler_method('_on_event2') is False
-        assert _is_valid_handler_method('_on_event_2') is False
+    def test_digits_accepted(self):
+        """Digits ARE allowed (pattern ``^_on_[a-z0-9_]+$``).
+
+        The suite's event namespace includes ``3pl.*``, so handlers like
+        ``_on_3pl_inbound_queued`` must pass — the original ``[a-z_]+``
+        pattern silently rejected them at dispatch (2026-06-10 fix). The
+        security property lives in the ``_on_`` prefix + lowercase-only
+        charset, not in excluding digits.
+        """
+        assert _is_valid_handler_method('_on_event2') is True
+        assert _is_valid_handler_method('_on_event_2') is True
+        assert _is_valid_handler_method('_on_3pl_inbound_queued') is True
 
     def test_special_characters_rejected(self):
         for name in ['_on_event-x', '_on_event.x', '_on_event x', '_on_event!']:

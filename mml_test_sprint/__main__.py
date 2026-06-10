@@ -1,8 +1,10 @@
 """Entry point for ``python -m mml_test_sprint``.
 
 Parses CLI flags into environment variables *before* importing the
-runner so the config module sees the override values. All flags are
-optional — unset values fall back to the defaults in ``config.py``.
+runner so the config module sees the values. ``config.py`` no longer
+ships any host/credential defaults: the required ``MML_TEST_*`` vars must
+be supplied either via these flags or the environment, otherwise config
+import fails closed with a clear error. See ``README.md`` for the full list.
 
 Flags:
     --target URL              (sets MML_TEST_BASE_URL)
