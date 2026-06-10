@@ -130,14 +130,48 @@ class _FakeRegistry:
         return self._map.get(name, _NullService())
 
 
+class _EmptyRecordset:
+    """Falsy stand-in for an empty Odoo search() result."""
+
+    def __bool__(self):
+        return False
+
+
+class _FakeMessageModel:
+    """Fake 3pl.message: search() returns pre-seeded create-type inward_order
+    rows keyed by PO id, modelling the direct-path dedup guard the bridge mirrors.
+
+    existing_po_ids is the set of PO ids that already have a create-type
+    inward_order message (queued by the mml_freight direct path).
+    """
+
+    def __init__(self, existing_po_ids):
+        self._existing = set(existing_po_ids or ())
+
+    def search(self, domain, limit=None):
+        ref_id = next((v for (f, op, v) in domain if f == 'ref_id'), None)
+        if ref_id in self._existing:
+            # Odoo search(limit=1) returns a singleton recordset (truthy, .id).
+            return types.SimpleNamespace(id=9000 + ref_id)
+        # Empty recordset: falsy, like Odoo's empty search result.
+        return _EmptyRecordset()
+
+
 class _FakeEnv:
-    def __init__(self, service_map, booking_map, seen_keys=None):
+    def __init__(self, service_map, booking_map, seen_keys=None, existing_msg_po_ids=None):
         self._registry = _FakeRegistry(service_map)
         self._booking_map = booking_map
+        self._existing_msg_po_ids = existing_msg_po_ids or ()
         self.emitted = []
         # Shared across emitters built from this env, so repeated dispatch of
         # the same event hits the same dedupe set (models the DB UNIQUE index).
         self.seen_keys = seen_keys if seen_keys is not None else set()
+
+    def __contains__(self, model_name):
+        # The bridge probes ``'3pl.message' in self.env`` before searching for
+        # an existing inward_order — stock_3pl_core is always present in these
+        # tests, so the model is available.
+        return model_name in ('mml.registry', 'mml.event', 'freight.booking', '3pl.message')
 
     def __getitem__(self, model_name):
         if model_name == 'mml.registry':
@@ -146,6 +180,8 @@ class _FakeEnv:
             return _FakeEventEmitter(self.emitted, self.seen_keys)
         if model_name == 'freight.booking':
             return _FakeBookingModel(self._booking_map)
+        if model_name == '3pl.message':
+            return _FakeMessageModel(self._existing_msg_po_ids)
         raise KeyError(model_name)
 
 
@@ -162,8 +198,8 @@ class _FakeBookingModel:
         return stub
 
 
-def _make_env(service_map, booking_map):
-    return _FakeEnv(service_map, booking_map)
+def _make_env(service_map, booking_map, existing_msg_po_ids=None):
+    return _FakeEnv(service_map, booking_map, existing_msg_po_ids=existing_msg_po_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -439,3 +475,66 @@ class TestOnFreightBookingConfirmed:
         assert '99' in key and '42' in key, (
             f"dedupe_key {key!r} must reference both booking (99) and PO (42)"
         )
+
+
+class TestDirectPathDedupGuard:
+    """The bridge must not double-queue an inward_order for a PO that the
+    mml_freight direct path (freight.booking.action_confirm) already queued.
+
+    The guard mirrors mml_freight._queue_3pl_inward_order: it searches
+    3pl.message for a create-type inward_order on the PO and skips if found.
+    """
+
+    def test_skips_po_with_existing_inward_order_message(self):
+        """A PO that already has a create-type inward_order is not re-queued."""
+        svc = Mock3PLService(msg_id=500)
+        po = _make_po(po_id=5)
+        booking = _make_booking(res_id=10, po_ids=[po])
+        env = _make_env(
+            service_map={'3pl': svc},
+            booking_map={10: booking},
+            existing_msg_po_ids={5},  # direct path already queued PO 5
+        )
+        handler = _make_handler(env)
+
+        handler._on_freight_booking_confirmed(_event(res_id=10))
+
+        assert svc.queue_inward_order_calls == []  # no second queue
+        assert env.emitted == []  # no second billing event
+
+    def test_only_already_queued_po_is_skipped(self):
+        """POs without an existing message still queue; only the dup is skipped."""
+        svc = Mock3PLService(msg_id=500)
+        po1 = _make_po(po_id=1)  # already queued by direct path
+        po2 = _make_po(po_id=2)  # fresh — bridge should queue it
+        booking = _make_booking(res_id=10, po_ids=[po1, po2])
+        env = _make_env(
+            service_map={'3pl': svc},
+            booking_map={10: booking},
+            existing_msg_po_ids={1},
+        )
+        handler = _make_handler(env)
+
+        handler._on_freight_booking_confirmed(_event(res_id=10))
+
+        assert svc.queue_inward_order_calls == [2]
+        assert len(env.emitted) == 1
+        assert env.emitted[0]['res_id'] == 2
+
+    def test_no_existing_messages_queues_all_pos(self):
+        """Baseline: with no pre-existing messages, every PO is queued (guard is inert)."""
+        svc = Mock3PLService(msg_id=500)
+        po1 = _make_po(po_id=1)
+        po2 = _make_po(po_id=2)
+        booking = _make_booking(res_id=10, po_ids=[po1, po2])
+        env = _make_env(
+            service_map={'3pl': svc},
+            booking_map={10: booking},
+            existing_msg_po_ids=set(),
+        )
+        handler = _make_handler(env)
+
+        handler._on_freight_booking_confirmed(_event(res_id=10))
+
+        assert svc.queue_inward_order_calls == [1, 2]
+        assert len(env.emitted) == 2

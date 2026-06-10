@@ -9,6 +9,7 @@
     'depends': ['mail', 'base'],
     'data': [
         'security/ir.model.access.csv',
+        'security/mml_security.xml',
         'data/ir_cron.xml',
         'views/mml_event_dispatch_failure_views.xml',
     ],

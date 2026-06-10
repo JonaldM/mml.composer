@@ -88,13 +88,64 @@ class MockROQServiceRaises:
 # Fake Odoo environment plumbing
 # ---------------------------------------------------------------------------
 
-def _make_record(res_id, write_store=None, exists=True, message_posts=None):
-    """Return a minimal record-like object that tracks write() and message_post()."""
+def _make_po(po_id, company_id=None):
+    """Return a minimal purchase.order-like record carrying company_id."""
+    company = types.SimpleNamespace(id=company_id) if company_id else False
+    return types.SimpleNamespace(id=po_id, company_id=company)
+
+
+class _FakePoRecordset:
+    """Models roq.shipment.group.po_ids just enough for the bridge.
+
+    The handler does ``sg.po_ids[:1]`` then reads ``.company_id`` — in Odoo
+    slicing a recordset yields a (possibly empty) recordset, NOT a list. This
+    shim returns the singleton PO on ``[:1]`` or a falsy empty recordset when
+    there are no POs, matching that contract.
+    """
+
+    def __init__(self, pos):
+        self._pos = list(pos)
+
+    def __bool__(self):
+        return bool(self._pos)
+
+    def __iter__(self):
+        return iter(self._pos)
+
+    def __getitem__(self, key):
+        sliced = self._pos[key]
+        if isinstance(key, slice):
+            return sliced[0] if sliced else _EmptyPoRecordset()
+        return sliced
+
+
+class _EmptyPoRecordset:
+    """Falsy empty po recordset; .company_id reads as falsy like empty Odoo recordsets."""
+
+    company_id = False
+
+    def __bool__(self):
+        return False
+
+
+def _make_record(res_id, write_store=None, exists=True, message_posts=None,
+                 freight_tender_id=None, po_ids=None):
+    """Return a minimal record-like object that tracks write() and message_post().
+
+    freight_tender_id models the replay-idempotency anchor: when truthy the
+    bridge must skip creating a second tender. po_ids models the consolidated
+    POs the bridge reads company_id from for multi-company tender stamping.
+    """
+    # freight_tender_id is a Many2one in Odoo; model it as a record-like with
+    # an .id (or False when unset) so handler code can read .id safely.
+    tender = types.SimpleNamespace(id=freight_tender_id) if freight_tender_id else False
     record = types.SimpleNamespace(
         id=res_id,
         _write_vals=None,
         _message_posts=message_posts if message_posts is not None else [],
         _exists=exists,
+        freight_tender_id=tender,
+        po_ids=_FakePoRecordset(po_ids if po_ids is not None else []),
     )
 
     def _write(vals):
@@ -109,6 +160,7 @@ def _make_record(res_id, write_store=None, exists=True, message_posts=None):
     record.write = _write
     record.exists = _exists_fn
     record.message_post = _message_post
+    record.sudo = lambda: record
     return record
 
 
@@ -166,6 +218,8 @@ class _FakeModel:
             _write_vals=None,
             _message_posts=[],
             _exists=False,
+            freight_tender_id=False,
+            po_ids=_FakePoRecordset([]),
         )
 
         def _exists_fn():
@@ -180,6 +234,7 @@ class _FakeModel:
         rec.exists = _exists_fn
         rec.write = _write
         rec.message_post = _message_post
+        rec.sudo = lambda: rec
         return rec
 
 
@@ -358,6 +413,100 @@ class TestOnShipmentGroupConfirmed:
 
         # Must not raise
         handler._on_shipment_group_confirmed(event)
+
+
+class TestOnShipmentGroupConfirmedReplayAndCompany:
+    """Replay idempotency, partial-state rollback, and multi-company stamping."""
+
+    def _event(self, res_id=10, payload=None):
+        return types.SimpleNamespace(
+            id=99,
+            res_id=res_id,
+            payload_json=json.dumps(payload) if payload else None,
+        )
+
+    def test_skips_create_when_tender_already_linked(self):
+        """Replay: if the SG already has freight_tender_id, no second tender is created."""
+        freight_svc = MockFreightService(tender_id=77)
+        sg_record = _make_record(res_id=10, freight_tender_id=500)
+        env = _make_env(
+            registry_map={'freight': freight_svc},
+            model_records={'roq.shipment.group': {10: sg_record}},
+        )
+        handler = _make_handler(env)
+        event = self._event(res_id=10, payload={'group_ref': 'GRP-RP'})
+
+        handler._on_shipment_group_confirmed(event)
+
+        assert freight_svc.create_tender_calls == []  # idempotent — no create
+        assert sg_record._write_vals is None  # no re-write of the link
+
+    def test_no_op_when_shipment_group_does_not_exist(self):
+        """If the SG row is gone, the handler returns before calling the service."""
+        freight_svc = MockFreightService(tender_id=77)
+        env = _make_env(registry_map={'freight': freight_svc}, model_records={})
+        handler = _make_handler(env)
+        event = self._event(res_id=12345, payload={'group_ref': 'GRP-GONE'})
+
+        handler._on_shipment_group_confirmed(event)
+
+        assert freight_svc.create_tender_calls == []
+
+    def test_company_id_from_shipment_group_po_is_passed_to_create_tender(self):
+        """Multi-company: tender vals carry the SG PO's company, not the dispatcher's."""
+        freight_svc = MockFreightService(tender_id=77)
+        po = _make_po(po_id=1, company_id=7)
+        sg_record = _make_record(res_id=10, po_ids=[po])
+        env = _make_env(
+            registry_map={'freight': freight_svc},
+            model_records={'roq.shipment.group': {10: sg_record}},
+        )
+        handler = _make_handler(env)
+        event = self._event(res_id=10, payload={'group_ref': 'GRP-CO'})
+
+        handler._on_shipment_group_confirmed(event)
+
+        assert freight_svc.create_tender_calls[0]['company_id'] == 7
+
+    def test_no_company_id_key_when_po_has_no_company(self):
+        """When the SG has no POs (no company anchor), company_id is left to the model default."""
+        freight_svc = MockFreightService(tender_id=77)
+        sg_record = _make_record(res_id=10, po_ids=[])
+        env = _make_env(
+            registry_map={'freight': freight_svc},
+            model_records={'roq.shipment.group': {10: sg_record}},
+        )
+        handler = _make_handler(env)
+        event = self._event(res_id=10, payload={'group_ref': 'GRP-NC'})
+
+        handler._on_shipment_group_confirmed(event)
+
+        assert 'company_id' not in freight_svc.create_tender_calls[0]
+
+    def test_write_back_failure_is_caught_and_posts_chatter(self):
+        """Partial-state: the tender-id write-back runs INSIDE the try/except, so a
+        write failure is caught (and surfaced via chatter) rather than propagating —
+        proving the write is no longer outside the guarded block."""
+        freight_svc = MockFreightService(tender_id=77)
+        sg_record = _make_record(res_id=10)
+
+        def _raising_write(vals):
+            raise RuntimeError("write failed")
+
+        sg_record.write = _raising_write
+        env = _make_env(
+            registry_map={'freight': freight_svc},
+            model_records={'roq.shipment.group': {10: sg_record}},
+        )
+        handler = _make_handler(env)
+        event = self._event(res_id=10, payload={'group_ref': 'GRP-WF'})
+
+        # Must not raise — the write-back is inside the same try as create_tender.
+        handler._on_shipment_group_confirmed(event)
+
+        assert len(freight_svc.create_tender_calls) == 1
+        assert len(sg_record._message_posts) == 1
+        assert 'write failed' in sg_record._message_posts[0]['body']
 
 
 # ---------------------------------------------------------------------------

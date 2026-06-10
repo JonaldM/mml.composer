@@ -16,7 +16,10 @@ class MmlPlatformSync(models.AbstractModel):
         """
         from odoo.addons.mml_base.services.platform_client import PlatformClientBase
         client = PlatformClientBase()
-        pending = self.env['mml.event'].search(
+        # The cron runs as a non-superuser; mml.event write is restricted to
+        # group_system. Use sudo() so the pending fetch and the synced-flag
+        # write-back below do not raise AccessError.
+        pending = self.env['mml.event'].sudo().search(
             [('synced_to_platform', '=', False)], limit=500
         )
         if not pending:

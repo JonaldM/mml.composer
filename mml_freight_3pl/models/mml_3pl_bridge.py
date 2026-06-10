@@ -34,7 +34,26 @@ class Mml3plBridge(models.AbstractModel):
             return
 
         svc = self.env['mml.registry'].service('3pl')
+        has_message_model = '3pl.message' in self.env
         for po in booking.po_ids:
+            # Dedup guard mirroring the direct path in
+            # mml_freight.freight_booking._queue_3pl_inward_order(): that path
+            # also queues a create-type inward_order per PO on action_confirm().
+            # If one already exists for this PO, skip so the bridge does not
+            # create a second 3pl.message for the same inbound.
+            if has_message_model:
+                existing = self.env['3pl.message'].search([
+                    ('ref_model', '=', 'purchase.order'),
+                    ('ref_id', '=', po.id),
+                    ('document_type', '=', 'inward_order'),
+                    ('action', '=', 'create'),
+                ], limit=1)
+                if existing:
+                    _logger.info(
+                        '3PL bridge: inward_order already queued for PO id=%s '
+                        '(msg %s) — skipping', po.id, existing.id,
+                    )
+                    continue
             msg_id = svc.queue_inward_order(po.id)
             if msg_id:
                 _logger.info(

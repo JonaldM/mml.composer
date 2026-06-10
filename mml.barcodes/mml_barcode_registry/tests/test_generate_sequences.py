@@ -58,3 +58,23 @@ class TestGenerateSequences(TransactionCase):
 
     def test_capacity_computed(self):
         self.assertEqual(self.prefix.capacity, 10)
+
+
+def test_prefix_has_sequence_range_constraint():
+    """A constrains method must reject inverted/negative sequence ranges.
+
+    Without it a user can save sequence_start > sequence_end; capacity then
+    computes to zero and generation silently produces no records.
+    """
+    import pathlib
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / 'models' / 'barcode_prefix.py'
+    ).read_text()
+    assert "@api.constrains('sequence_start', 'sequence_end')" in src, (
+        "barcode_prefix.py must declare an @api.constrains on "
+        "('sequence_start', 'sequence_end')"
+    )
+    assert 'ValidationError' in src, (
+        "the range constraint must raise ValidationError on an invalid range"
+    )

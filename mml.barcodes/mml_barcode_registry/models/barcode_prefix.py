@@ -69,6 +69,20 @@ class BarcodePrefix(models.Model):
                     f"GS1 prefix must be exactly 7 digits, got: {rec.prefix!r}"
                 )
 
+    @api.constrains('sequence_start', 'sequence_end')
+    def _check_sequence_range(self):
+        for rec in self:
+            if rec.sequence_start < 0:
+                raise ValidationError(
+                    f"Sequence start must be non-negative, got: {rec.sequence_start}"
+                )
+            if rec.sequence_start > rec.sequence_end:
+                raise ValidationError(
+                    f"Sequence start ({rec.sequence_start}) must be less than or equal "
+                    f"to sequence end ({rec.sequence_end}). An inverted range yields zero "
+                    f"capacity and silently generates no barcodes."
+                )
+
     @api.depends('sequence_start', 'sequence_end')
     def _compute_capacity(self):
         for rec in self:

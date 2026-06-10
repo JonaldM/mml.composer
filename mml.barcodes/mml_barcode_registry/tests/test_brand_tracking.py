@@ -4,8 +4,9 @@ import pathlib
 
 
 def test_brand_id_has_tracking_true():
-    src = pathlib.Path(
-        'mml.barcodes/mml_barcode_registry/models/barcode_allocation.py'
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / 'models' / 'barcode_allocation.py'
     ).read_text()
     tree = ast.parse(src)
 
@@ -23,8 +24,9 @@ def test_brand_id_has_tracking_true():
 
 
 def test_model_inherits_mail_thread():
-    src = pathlib.Path(
-        'mml.barcodes/mml_barcode_registry/models/barcode_allocation.py'
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / 'models' / 'barcode_allocation.py'
     ).read_text()
     assert 'mail.thread' in src, (
         "BarcodeAllocation must inherit mail.thread for tracking=True to work"

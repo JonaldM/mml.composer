@@ -60,3 +60,22 @@ class MmlEventDispatchFailure(models.Model):
         'res.users',
         help='User who marked the failure resolved.',
     )
+
+    def write(self, vals):
+        """Stamp resolved_at / resolved_by when a row transitions to resolved.
+
+        Only records that are newly resolved (False -> True in this write) are
+        stamped, and only when the caller has not supplied those fields itself.
+        Records that were already resolved keep their original stamp, and a
+        write that sets resolved=False does not stamp anything.
+        """
+        if vals.get('resolved') and 'resolved_at' not in vals and 'resolved_by' not in vals:
+            newly_resolved = self.filtered(lambda r: not r.resolved)
+            res = super().write(vals)
+            if newly_resolved:
+                newly_resolved.write({
+                    'resolved_at': fields.Datetime.now(),
+                    'resolved_by': self.env.uid,
+                })
+            return res
+        return super().write(vals)

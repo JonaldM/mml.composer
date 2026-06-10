@@ -19,3 +19,4 @@ if _STUB:
     from . import test_pure_null_service
     from . import test_pure_registry_constants
     from . import test_pure_event_idempotent_emit
+    from . import test_pure_dispatch_failure_resolve

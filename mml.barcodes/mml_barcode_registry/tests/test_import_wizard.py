@@ -104,8 +104,9 @@ class TestImportWizard(TransactionCase):
 def test_import_wizard_uses_savepoint_for_allocation():
     """Auto-allocation block must use savepoint to prevent orphaned registry records."""
     import pathlib
-    src = pathlib.Path(
-        'mml.barcodes/mml_barcode_registry/wizard/barcode_import_wizard.py'
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / 'wizard' / 'barcode_import_wizard.py'
     ).read_text()
     assert 'savepoint' in src, (
         "Import wizard must wrap auto-allocation in self.env.cr.savepoint() "

@@ -245,10 +245,32 @@ class TestUniqueActiveAllocation(TransactionCase):
 def test_exhausted_prefix_error_message_is_accurate():
     """Error message on exhausted prefix must reflect live state, not stale count."""
     import pathlib
-    src = pathlib.Path(
-        'mml.barcodes/mml_barcode_registry/models/product_product.py'
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / 'models' / 'product_product.py'
     ).read_text()
     assert 'search_count' in src, (
         "After FOR UPDATE SKIP LOCKED, must re-query search_count to verify "
         "actual availability before raising error"
+    )
+
+
+def test_init_creates_registry_active_unique_index():
+    """init() must create a partial unique index on registry_id WHERE active.
+
+    Without it, two different products can each hold an active allocation
+    pointing at the SAME registry slot — the (product_id, company_id) index
+    does not catch that case.
+    """
+    import pathlib
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / 'models' / 'barcode_allocation.py'
+    ).read_text()
+    assert 'barcode_allocation_registry_active_uniq' in src, (
+        "init() must create a UNIQUE INDEX on registry_id WHERE status='active' "
+        "to prevent two products sharing one active registry slot"
+    )
+    assert '(registry_id)' in src, (
+        "registry-slot unique index must key on (registry_id)"
     )

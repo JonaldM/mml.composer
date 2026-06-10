@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Multi-company isolation for mml.capability.
+        mml.capability carries a company_id but had no record rule, so
+        capability lookups (has(), register()) leaked across the 7 companies.
+        Scope reads to global rows (company_id unset) OR rows belonging to one
+        of the user's allowed companies.
+    -->
+    <record id="mml_capability_company_rule" model="ir.rule">
+        <field name="name">mml.capability: multi-company</field>
+        <field name="model_id" ref="model_mml_capability"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+</odoo>

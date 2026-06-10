@@ -96,6 +96,16 @@ class BarcodeAllocation(models.Model):
             ON mml_barcode_allocation (product_id, company_id)
             WHERE status = 'active'
         """)
+        # Enforce one active allocation per registry slot at the DB level. Without
+        # this, two different products can each take an active allocation pointing
+        # at the SAME registry slot — the (product_id, company_id) index above does
+        # not catch it because the products differ. This closes the double-
+        # allocation race so a single GTIN can never be live on two products.
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS barcode_allocation_registry_active_uniq
+            ON mml_barcode_allocation (registry_id)
+            WHERE status = 'active'
+        """)
 
     @api.depends('gtin_13', 'product_id.display_name', 'status')
     def _compute_display_name(self):
